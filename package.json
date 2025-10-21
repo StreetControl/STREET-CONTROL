@@ -1,0 +1,27 @@
+{
+  "name": "street-control",
+  "version": "1.0.0",
+  "description": "Software di gestione gare Streetlifting - Full Cloud Stack",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install"
+  },
+  "keywords": [
+    "streetlifting",
+    "competition",
+    "management",
+    "realtime"
+  ],
+  "author": "Street Control Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

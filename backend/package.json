@@ -1,0 +1,32 @@
+{
+  "name": "street-control-backend",
+  "version": "1.0.0",
+  "description": "Street Control Backend API",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "streetlifting",
+    "api",
+    "realtime"
+  ],
+  "author": "Street Control Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "@supabase/supabase-js": "^2.45.4",
+    "ws": "^8.18.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^7.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.5"
+  }
+}
