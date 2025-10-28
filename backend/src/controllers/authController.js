@@ -283,7 +283,7 @@ export async function verifySession(req, res) {
     const authUser = req.user // Già verificato da middleware
 
     // Query user info
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('id, name, role')
       .eq('auth_uid', authUser.id)
