@@ -1,0 +1,105 @@
+/**
+ * 🎨 STREET CONTROL - GLOBAL STYLES
+ * Dark mode GitHub-like design
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  body {
+    @apply bg-dark-bg text-dark-text antialiased;
+  }
+
+  * {
+    @apply border-dark-border;
+  }
+}
+
+/* Custom components */
+@layer components {
+  /* Button Primary */
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Button Secondary */
+  .btn-secondary {
+    @apply bg-dark-bg-tertiary hover:bg-dark-border text-dark-text font-semibold py-3 px-6 rounded-lg transition-all duration-200 border border-dark-border hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Input Field */
+  .input-field {
+    @apply w-full bg-dark-bg-secondary border border-dark-border text-dark-text px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 placeholder-dark-text-muted;
+  }
+
+  /* Card Container */
+  .card {
+    @apply bg-dark-bg-secondary border border-dark-border rounded-lg shadow-dark;
+  }
+
+  /* Card Hover */
+  .card-hover {
+    @apply card hover:bg-dark-bg-tertiary hover:border-primary transition-all duration-200 cursor-pointer;
+  }
+
+  /* Label */
+  .label {
+    @apply block text-sm font-medium text-dark-text-secondary mb-2;
+  }
+
+  /* Error Message */
+  .error-message {
+    @apply bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm;
+  }
+
+  /* Success Message */
+  .success-message {
+    @apply bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg text-sm;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-dark-bg-tertiary text-dark-text-secondary border border-dark-border;
+  }
+}
+
+/* Utilities */
+@layer utilities {
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-dark-bg-secondary/50 backdrop-blur-md;
+  }
+
+  /* Smooth scrolling */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Custom scrollbar (dark mode) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(167, 139, 250, 0.3);
+  color: #c9d1d9;
+}

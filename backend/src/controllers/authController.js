@@ -4,7 +4,7 @@
  * Gestisce logica autenticazione usando Supabase Auth
  */
 
-import { supabase } from '../services/supabase.js'
+import { supabaseAuth, supabaseAdmin } from '../services/supabase.js'
 
 /**
  * ============================================
@@ -24,8 +24,8 @@ export async function loginOrganization(req, res) {
       })
     }
 
-    // 1. Login con Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    // 1. Login con Supabase Auth (usa ANON_KEY)
+    const { data: authData, error: authError } = await supabaseAuth.auth.signInWithPassword({
       email,
       password
     })
@@ -37,8 +37,8 @@ export async function loginOrganization(req, res) {
       })
     }
 
-    // 2. Query tabella users per ottenere info federazione
-    const { data: user, error: userError } = await supabase
+    // 2. Query tabella users con SERVICE_ROLE_KEY (bypassa RLS)
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('id, name, role, created_at')
       .eq('auth_uid', authData.user.id)
@@ -51,7 +51,29 @@ export async function loginOrganization(req, res) {
       })
     }
 
-    // 3. Restituisci token Supabase + user info
+    // 3. Determina ruoli disponibili in base al ruolo DB
+    const availableRoles = []
+    
+    // SUPER_ADMIN e ADMIN possono usare tutti i ruoli
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+      availableRoles.push(
+        { id: 1, role: 'DIRECTOR', name: 'Regista' },
+        { id: 2, role: 'ORGANIZER', name: 'Pre-Gara' },
+        { id: 3, role: 'REFEREE', name: 'Giudice' }
+      )
+    } 
+    // Altri ruoli possono usare solo il loro ruolo specifico
+    else if (user.role === 'DIRECTOR') {
+      availableRoles.push({ id: 1, role: 'DIRECTOR', name: 'Regista' })
+    }
+    else if (user.role === 'ORGANIZER') {
+      availableRoles.push({ id: 2, role: 'ORGANIZER', name: 'Pre-Gara' })
+    }
+    else if (user.role === 'REFEREE') {
+      availableRoles.push({ id: 3, role: 'REFEREE', name: 'Giudice' })
+    }
+
+    // 4. Restituisci token Supabase + user info
     res.json({
       success: true,
       token: authData.session.access_token,
@@ -61,7 +83,9 @@ export async function loginOrganization(req, res) {
         name: user.name,
         role: user.role,
         email: authData.user.email,
-        auth_uid: authData.user.id
+        auth_uid: authData.user.id,
+        available_roles: availableRoles,
+        organization_name: user.name // Frontend si aspetta questo campo
       }
     })
 
@@ -85,19 +109,27 @@ export async function loginOrganization(req, res) {
  */
 export async function selectRole(req, res) {
   try {
-    const { role, meet_id, judge_name } = req.body
+    const { role_id, meet_id, judge_name } = req.body
     const authUser = req.user // Popolato da middleware verifyToken
 
+    // Mappa role_id a role string
+    const roleMap = {
+      1: 'DIRECTOR',
+      2: 'ORGANIZER',
+      3: 'REFEREE'
+    }
+
+    const role = roleMap[role_id]
+
     // Validazione role
-    const validRoles = ['DIRECTOR', 'REFEREE', 'ORGANIZER']
-    if (!validRoles.includes(role)) {
+    if (!role) {
       return res.status(400).json({ 
         error: 'Ruolo non valido' 
       })
     }
 
-    // 1. Query tabella users
-    const { data: user, error: userError } = await supabase
+    // 1. Query tabella users con supabaseAdmin
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('auth_uid', authUser.id)
@@ -131,7 +163,7 @@ export async function selectRole(req, res) {
       }
 
       // Query: trova giudice per questa gara
-      const { data: judge, error: judgeError } = await supabase
+      const { data: judge, error: judgeError } = await supabaseAdmin
         .from('judges')
         .select('*')
         .eq('user_id', user.id)
@@ -144,8 +176,8 @@ export async function selectRole(req, res) {
         })
       }
 
-      // Genera token Supabase con metadata custom
-      const { data: sessionData, error: sessionError } = await supabase.auth.updateUser({
+      // Genera token Supabase con metadata custom (usa supabaseAuth)
+      const { data: sessionData, error: sessionError } = await supabaseAuth.auth.updateUser({
         data: {
           active_role: 'REFEREE',
           judge_id: judge.id,
@@ -173,7 +205,7 @@ export async function selectRole(req, res) {
     }
 
     // 4. Per DIRECTOR e ORGANIZER: aggiorna metadata sessione
-    const { data: sessionData, error: sessionError } = await supabase.auth.updateUser({
+    const { data: sessionData, error: sessionError } = await supabaseAuth.auth.updateUser({
       data: {
         active_role: role
       }
@@ -214,8 +246,8 @@ export async function logout(req, res) {
   try {
     const authUser = req.user
 
-    // Supabase logout (invalida token)
-    const { error } = await supabase.auth.signOut()
+    // Supabase logout (invalida token) - usa supabaseAuth
+    const { error } = await supabaseAuth.auth.signOut()
 
     if (error) {
       console.error('❌ Logout error:', error)

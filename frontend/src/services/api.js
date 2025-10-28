@@ -1,20 +1,76 @@
 /**
  * 🌐 BACKEND API CLIENT
  * 
- * Funzioni per chiamare il backend Express.
- * Usa questo per operazioni che richiedono logica server-side.
+ * Client HTTP configurato per comunicare con il backend Express.
+ * Usa Axios con interceptors per gestire autenticazione e errori.
  * 
  * ESEMPIO USO:
  * 
- * import { submitVote, advanceToNextAthlete } from '@/services/api'
+ * import api from '@/services/api'
  * 
- * await submitVote({ attempt_id: 42, judge_id: 1, vote: 'VALID' })
+ * // Chiamate autenticate (token automatico)
+ * const response = await api.post('/auth/login', { email, password })
+ * const data = await api.get('/meets')
  */
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api'
+
+// Crea istanza Axios
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// 📤 REQUEST INTERCEPTOR - Aggiungi token a ogni richiesta
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 📥 RESPONSE INTERCEPTOR - Gestisci errori globali
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Token scaduto o invalido
+    if (error.response?.status === 401) {
+      // Clear auth data
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      
+      // Redirect to login (solo se non siamo già lì)
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    
+    // Server error
+    if (error.response?.status >= 500) {
+      console.error('Server error:', error.response);
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 /**
- * Helper per fetch con error handling
+ * Helper per fetch con error handling (LEGACY - deprecato)
  */
 async function apiRequest(endpoint, options = {}) {
   try {
@@ -132,16 +188,7 @@ export async function updateAthleteWeight({ athlete_id, body_weight }) {
 }
 
 // ============================================
-// EXPORT DEFAULT
+// EXPORT DEFAULT - Axios instance
 // ============================================
 
-export default {
-  submitVote,
-  advanceToNextAthlete,
-  overrideAttemptResult,
-  updateDeclaredWeight,
-  createMeet,
-  getMeet,
-  addAthlete,
-  updateAthleteWeight
-}
+export default api;
