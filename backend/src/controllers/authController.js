@@ -73,6 +73,15 @@ export async function loginOrganization(req, res) {
       availableRoles.push({ id: 3, role: 'REFEREE', name: 'Giudice' })
     }
 
+    // Helper: gestisce il nome dell'organizzazione
+    const getDisplayName = (name) => {
+      if (!name) return 'Organizzazione';
+      if (name.toUpperCase().includes('SLI')) {
+        return 'STREET LIFTING ITALIA';
+      }
+      return name;
+    };
+
     // 4. Restituisci token Supabase + user info
     res.json({
       success: true,
@@ -85,7 +94,7 @@ export async function loginOrganization(req, res) {
         email: authData.user.email,
         auth_uid: authData.user.id,
         available_roles: availableRoles,
-        organization_name: user.name // Frontend si aspetta questo campo
+        organization_name: getDisplayName(user.name)
       }
     })
 
@@ -295,6 +304,15 @@ export async function verifySession(req, res) {
       })
     }
 
+    // Helper: gestisce il nome dell'organizzazione
+    const getDisplayName = (name) => {
+      if (!name) return 'Organizzazione';
+      if (name.toUpperCase().includes('SLI')) {
+        return 'STREET LIFTING ITALIA';
+      }
+      return name;
+    };
+
     res.json({
       success: true,
       user: {
@@ -302,7 +320,8 @@ export async function verifySession(req, res) {
         name: user.name,
         role: user.role,
         email: authUser.email,
-        active_role: authUser.user_metadata?.active_role || null
+        active_role: authUser.user_metadata?.active_role || null,
+        organization_name: getDisplayName(user.name)
       }
     })
 
