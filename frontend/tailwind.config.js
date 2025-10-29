@@ -32,6 +32,7 @@ export default {
       fontFamily: {
         'sans': ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
         'mono': ['ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace'],
+        'display': ['Orbitron', 'sans-serif'], // Font moderno per titoli
       },
       boxShadow: {
         'dark': '0 0 0 1px rgba(110, 118, 129, 0.4)',

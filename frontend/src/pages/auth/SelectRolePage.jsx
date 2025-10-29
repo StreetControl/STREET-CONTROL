@@ -14,36 +14,41 @@ const SelectRolePage = () => {
   const [selectedRole, setSelectedRole] = useState(null);
   const [error, setError] = useState('');
 
-  // Role configuration
+  // Role configuration con ordine di visualizzazione
   const roleConfig = {
-    'DIRECTOR': {
-      title: 'REGISTA',
-      subtitle: 'Gestisci il flusso della gara',
-      description: 'Controllo completo sulla progressione della competizione, gestione dei voli e coordinamento generale.',
-      icon: Settings,
-      color: 'from-blue-500/20 to-blue-600/20',
-      borderColor: 'border-blue-500/30',
-      iconColor: 'text-blue-400'
-    },
     'ORGANIZER': {
       title: 'PRE-GARA',
       subtitle: 'Configura atleti e parametri',
-      description: 'Gestione degli atleti, configurazione delle categorie, pesi corporei e parametri della gara.',
       icon: Users,
       color: 'from-green-500/20 to-green-600/20',
       borderColor: 'border-green-500/30',
-      iconColor: 'text-green-400'
+      iconColor: 'text-green-400',
+      order: 1
+    },
+    'DIRECTOR': {
+      title: 'REGISTA',
+      subtitle: 'Gestisci il flusso della gara',
+      icon: Settings,
+      color: 'from-blue-500/20 to-blue-600/20',
+      borderColor: 'border-blue-500/30',
+      iconColor: 'text-blue-400',
+      order: 2
     },
     'REFEREE': {
       title: 'GIUDICE',
       subtitle: user?.judge_position ? `Posizione: ${user.judge_position}` : 'Valuta le alzate',
-      description: 'Valutazione delle performance degli atleti durante la competizione.',
       icon: Gavel,
       color: 'from-purple-500/20 to-purple-600/20',
       borderColor: 'border-purple-500/30',
-      iconColor: 'text-purple-400'
+      iconColor: 'text-purple-400',
+      order: 3
     }
   };
+
+  // Ordina i ruoli disponibili
+  const sortedRoles = user.available_roles?.sort((a, b) => {
+    return roleConfig[a.role]?.order - roleConfig[b.role]?.order;
+  }) || [];
 
   const handleRoleSelect = async (role) => {
     setError('');
@@ -103,8 +108,12 @@ const SelectRolePage = () => {
         )}
 
         {/* Role Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {user.available_roles?.map((role) => {
+        <div className={`grid grid-cols-1 gap-6 mb-8 ${
+          sortedRoles.length === 1 
+            ? 'md:grid-cols-1 max-w-md mx-auto' 
+            : 'md:grid-cols-3'
+        }`}>
+          {sortedRoles.map((role) => {
             const config = roleConfig[role.role];
             if (!config) return null;
 
@@ -145,13 +154,8 @@ const SelectRolePage = () => {
                 </h3>
 
                 {/* Subtitle */}
-                <p className="text-primary text-sm font-medium mb-3">
+                <p className="text-primary text-sm font-medium mb-6">
                   {config.subtitle}
-                </p>
-
-                {/* Description */}
-                <p className="text-dark-text-secondary text-sm leading-relaxed mb-6">
-                  {config.description}
                 </p>
 
                 {/* Arrow Icon */}

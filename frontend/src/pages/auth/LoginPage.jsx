@@ -60,28 +60,46 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4 relative overflow-hidden">
+      {/* Background animated gradient */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+
+      <div className="w-full max-w-md relative z-10">
         {/* Logo + Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4">
+          {/* Logo with edge glow effects */}
+          <div className="relative inline-block mb-6 group">
             <img 
               src="/src/assets/images/streetControlLogo.svg" 
               alt="SLI Logo" 
-              className="w-24 h-24"
+              className="w-40 h-40 relative z-10
+                         drop-shadow-[0_0_20px_rgba(167,139,250,0.4)]
+                         group-hover:drop-shadow-[0_0_30px_rgba(167,139,250,0.7)]
+                         transition-all duration-500
+                         filter group-hover:brightness-110"
               onError={(e) => {
-                // Fallback to PNG if SVG not found
                 e.target.onerror = null;
                 e.target.src = '/src/assets/images/streetControlLogo.png';
               }}
             />
+            {/* Animated border glow */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse"></div>
+              <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+              <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-transparent via-primary to-transparent animate-pulse" style={{ animationDelay: '0.25s' }}></div>
+              <div className="absolute right-0 top-0 w-1 h-full bg-gradient-to-b from-transparent via-blue-500 to-transparent animate-pulse" style={{ animationDelay: '0.75s' }}></div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-dark-text mb-2">
+
+          {/* Title with custom font */}
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary
+                         tracking-wider animate-gradient font-display
+                         drop-shadow-[0_0_15px_rgba(167,139,250,0.3)]">
             STREET CONTROL
           </h1>
-          <p className="text-dark-text-secondary text-sm">
-            Accedi alla piattaforma di gestione gare
-          </p>
         </div>
 
         {/* Card with Form */}
@@ -97,7 +115,7 @@ const LoginPage = () => {
             {/* Email Input */}
             <div>
               <label htmlFor="email" className="label">
-                Email Organizzazione
+                E-mail
               </label>
               <input
                 type="email"
@@ -106,7 +124,7 @@ const LoginPage = () => {
                 value={formData.email}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="nome@organizzazione.it"
+                placeholder="Scrivi qua la tua e-mail"
                 required
                 autoFocus
                 disabled={loading}

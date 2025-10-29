@@ -103,3 +103,23 @@
   background: rgba(167, 139, 250, 0.3);
   color: #c9d1d9;
 }
+
+/* ============================================
+   CUSTOM ANIMATIONS
+============================================ */
+
+/* Gradient animation for title */
+@keyframes gradient {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
