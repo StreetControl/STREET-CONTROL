@@ -4,11 +4,10 @@
  * Middleware to verify Supabase JWT token
  * Protects routes that require authentication
  * 
- * Uses LOCAL JWT validation (no calls to Supabase)
+ * Uses LOCAL JWT validation
  */
 
 import jwt from 'jsonwebtoken'
-import { supabaseAdmin } from '../services/supabase.js'
 
 /**
  * Verifies Supabase JWT token validity LOCALLY
@@ -77,80 +76,6 @@ export async function verifyToken(req, res, next) {
   }
 }
 
-/**
- * Middleware to verify specific role
- * 
- * Usage:
- * router.post('/director/action', verifyToken, requireRole(['DIRECTOR']), controller)
- */
-export function requireRole(allowedRoles) {
-  return async (req, res, next) => {
-    try {
-      const authUser = req.user
-
-      if (!authUser) {
-        return res.status(401).json({ 
-          error: 'Authentication required' 
-        })
-      }
-
-      // Query user from DB (use supabaseAdmin to bypass RLS)
-      const { data: user, error } = await supabaseAdmin
-        .from('users')
-        .select('role')
-        .eq('auth_uid', authUser.id)
-        .single()
-
-      if (error || !user) {
-        return res.status(404).json({ 
-          error: 'User not found' 
-        })
-      }
-
-      // Verify role
-      if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({ 
-          error: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
-        })
-      }
-
-      // Save DB role in req for later use
-      req.dbRole = user.role
-
-      // Pass to controller
-      next()
-
-    } catch (error) {
-      console.error('Require role error:', error)
-      res.status(500).json({ 
-        error: 'Internal error during permission verification' 
-      })
-    }
-  }
-}
-
-/**
- * Middleware to verify active_role (for specific actions)
- * 
- * Example: Only users with DIRECTOR active role can press NEXT
- */
-export function requireActiveRole(allowedActiveRoles) {
-  return (req, res, next) => {
-    const authUser = req.user
-    const activeRole = authUser?.user_metadata?.active_role
-
-    if (!activeRole || !allowedActiveRoles.includes(activeRole)) {
-      return res.status(403).json({ 
-        error: `Action reserved for: ${allowedActiveRoles.join(' or ')}` 
-      })
-    }
-
-    next()
-  }
-}
-
 export default {
-  verifyToken,
-  requireRole,
-  requireActiveRole
+  verifyToken
 }
