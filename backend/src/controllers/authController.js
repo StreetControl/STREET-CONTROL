@@ -3,6 +3,8 @@
  */
 
 import { supabaseAdmin } from '../services/supabase.js'
+import { rolePermissions, validRoles } from '../config/roleData.js'
+import { getDisplayName } from '../utils/utils.js'
 
 /**
  * ============================================
@@ -18,7 +20,6 @@ export async function verifyRole(req, res) {
     const authUser = req.user // From middleware
 
     // Validate role format
-    const validRoles = ['DIRECTOR', 'ORGANIZER', 'REFEREE', 'ADMIN', 'SUPER_ADMIN']
     if (!role || !validRoles.includes(role)) {
       return res.status(400).json({ 
         success: false,
@@ -29,7 +30,7 @@ export async function verifyRole(req, res) {
     // Query user from DB
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
-      .select('id, name, role')
+      .select('role')
       .eq('auth_uid', authUser.id)
       .single()
 
@@ -38,15 +39,6 @@ export async function verifyRole(req, res) {
         success: false,
         error: 'User not found' 
       })
-    }
-
-    // Define role permissions matrix
-    const rolePermissions = {
-      'DIRECTOR': ['DIRECTOR', 'ADMIN', 'SUPER_ADMIN'],
-      'ORGANIZER': ['ORGANIZER', 'ADMIN', 'SUPER_ADMIN'],
-      'REFEREE': ['REFEREE', 'ADMIN', 'SUPER_ADMIN'],
-      'ADMIN': ['ADMIN', 'SUPER_ADMIN'],
-      'SUPER_ADMIN': ['SUPER_ADMIN']
     }
 
     // Check if user's DB role allows requested role
@@ -62,11 +54,6 @@ export async function verifyRole(req, res) {
     res.json({
       success: true,
       active_role: role,
-      user: {
-        id: user.id,
-        name: user.name,
-        role: user.role
-      }
     })
 
   } catch (error) {
@@ -80,12 +67,12 @@ export async function verifyRole(req, res) {
 
 /**
  * ============================================
- * GET AVAILABLE ROLES
+ * GET USER INFO
  * ============================================
  * 
  * Returns user info + available_roles
  */
-export async function getAvailableRoles(req, res) {
+export async function getUserInfos(req, res) {
   try {
     const authUser = req.user // Already verified by middleware
 
@@ -102,24 +89,6 @@ export async function getAvailableRoles(req, res) {
         error: 'User not found' 
       })
     }
-
-    // Helper: handles organization name display
-    const getDisplayName = (name) => {
-      if (!name) return 'Organization';
-      if (name.toUpperCase().includes('SLI')) {
-        return 'STREET LIFTING ITALIA';
-      } 
-      return name.toUpperCase();
-    };
-
-    // Define role permissions matrix (same as verifyRole)
-    const rolePermissions = {
-      'DIRECTOR': ['DIRECTOR', 'ADMIN', 'SUPER_ADMIN'],
-      'ORGANIZER': ['ORGANIZER', 'ADMIN', 'SUPER_ADMIN'],
-      'REFEREE': ['REFEREE', 'ADMIN', 'SUPER_ADMIN'],
-      'ADMIN': ['ADMIN', 'SUPER_ADMIN'],
-      'SUPER_ADMIN': ['SUPER_ADMIN']
-    };
 
     // Determine available roles based on user's DB role
     const availableRoles = [];
@@ -140,10 +109,9 @@ export async function getAvailableRoles(req, res) {
       success: true,
       user: {
         id: user.id,
-        name: user.name,
+        name: getDisplayName(user.name),
         role: user.role,
         available_roles: availableRoles,
-        organization_name: getDisplayName(user.name)
       }
     })
 
@@ -158,5 +126,5 @@ export async function getAvailableRoles(req, res) {
 
 export default {
   verifyRole,
-  getAvailableRoles
+  getUserInfos
 }

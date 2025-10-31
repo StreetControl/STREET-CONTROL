@@ -7,7 +7,7 @@
  */
 
 import express from 'express'
-import { getAvailableRoles, verifyRole } from '../controllers/authController.js'
+import { verifyRole, getUserInfos } from '../controllers/authController.js'
 import { verifyToken } from '../middleware/verifyToken.js'
 
 const router = express.Router()
@@ -27,12 +27,12 @@ const router = express.Router()
 router.post('/verify-role', verifyToken, verifyRole)
 
 /**
- * GET /api/auth/get-available-roles
- * Returns a list of available roles for the authenticated user
+ * GET /api/auth/user-info
+ * Returns the authenticated user's information including available roles
  * 
  * Headers: { Authorization: "Bearer <token>" }
- * Response: { roles: Array<"DIRECTOR" | "REFEREE" | "ORGANIZER"> }
+ * Response: { user: { id: string, name: string, role: string, roles: Array<string> } }
  */
-router.get('/get-available-roles', verifyToken, getAvailableRoles)
+router.get('/user-info', verifyToken, getUserInfos)
 
 export default router
