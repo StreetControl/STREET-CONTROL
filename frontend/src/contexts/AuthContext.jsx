@@ -1,16 +1,19 @@
 /**
- * 🔐 AUTH CONTEXT - GESTIONE AUTENTICAZIONE GLOBALE
+ * AUTH CONTEXT - GLOBAL AUTHENTICATION MANAGEMENT
  * 
- * Funzionalità:
- * - loginOrganization(email, password)
- * - selectRole(roleId)
- * - logout()
- * - Auto-restore session from localStorage
+ * Features:
+ * - login(email, password) → Login + save token
+ * - selectRole(role) → Select operational role (validates with backend)
+ * - logout() → Complete logout 
+ * 
+ * Backend API:
+ * - GET /api/auth/user-info → Get user info + available roles
+ * - POST /api/auth/verify-role → Validate and select role
  */
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import api from '../services/api';
+import api, { setApiToken } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -27,79 +30,107 @@ export const AuthProvider = ({ children }) => {
   const [activeRole, setActiveRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [session, setSession] = useState(null);
 
-  // 🔄 RESTORE SESSION ON MOUNT
+  // RESTORE SESSION ON MOUNT + LISTEN TO AUTH CHANGES
   useEffect(() => {
-    restoreSession();
+    // 1. Restore session on mount
+    const initAuth = async () => {
+      try {
+        setLoading(true);
+        
+        // Get current session from Supabase
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (error || !currentSession) {
+          console.log('No active session to restore');
+          return;
+        }
+        
+        // Set session and token
+        setSession(currentSession);
+        const token = currentSession.access_token;
+        setApiToken(token);
+        
+        // Fetch user data from backend
+        try {
+          await fetchUserInfo();
+        } catch (err) {
+          console.error('Failed to fetch user info during restore:', err);
+          // Clear invalid session
+          await supabase.auth.signOut();
+        }
+        
+      } catch (err) {
+        console.error('Session restore failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initAuth();
+
+    // 2. Listen to auth state changes (login, logout, token refresh)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      
+      // Update API client with new token (or null if logged out)
+      const token = session?.access_token || null;
+      setApiToken(token);
+      
+      // If user logged out from another tab, clear state
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setActiveRole(null);
+      }
+    });
+
+    // 3. Cleanup listener on unmount
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
-   * Restore session from localStorage
+   * LOGIN
+   * Login with Supabase → Get JWT token
    */
-  const restoreSession = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      // Verify token with backend
-      const response = await api.get('/auth/verify');
-      
-      if (response.data.success) {
-        setUser(response.data.user);
-        setActiveRole(response.data.user.active_role || null);
-      } else {
-        // Token invalid, clear localStorage
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-      }
-    } catch (err) {
-      console.error('Session restore failed:', err);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * 🔑 LOGIN ORGANIZATION
-   * Step 1: Email + Password → Get available roles
-   */
-  const loginOrganization = async (email, password) => {
+  const login = async (email, password) => {
     try {
       setError(null);
       setLoading(true);
 
-      const response = await api.post('/auth/login', {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (response.data.success) {
-        const { user, token } = response.data;
-        
-        // Save token and user data
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        setUser(user);
-        
-        return {
-          success: true,
-          user: user,
-          requiresRoleSelection: user.available_roles && user.available_roles.length > 1
-        };
-      } else {
-        throw new Error(response.data.message || 'Login fallito');
+      if (authError) {
+        throw new Error(authError.message || 'Credenziali non valide');
       }
+
+      if (!data.session) {
+        throw new Error('Sessione non creata');
+      }
+
+      // Set token immediately for API calls (don't wait for onAuthStateChange)
+      const token = data.session.access_token;
+      setApiToken(token);
+
+      // Fetch user info (now API has the token)
+      const userData = await fetchUserInfo();
+      console.log('User logged in:', userData);
+      return {
+        success: true,
+        user: userData,
+        requiresRoleSelection: userData.available_roles && userData.available_roles.length > 1
+      };
+
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Errore durante il login';
+      const errorMessage = err.message || 'Errore durante il login';
       setError(errorMessage);
+
       return {
         success: false,
         message: errorMessage
@@ -110,37 +141,41 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 👤 SELECT ROLE
-   * Step 2: Choose role from available_roles
+   * SELECT ROLE
+   * Choose role from available_roles
+   * 
+   * @param {string} role - Role string ('DIRECTOR' | 'ORGANIZER' | 'REFEREE')
    */
-  const selectRole = async (roleId) => {
+  const selectRole = async (role) => {
     try {
       setError(null);
       setLoading(true);
 
-      const response = await api.post('/auth/select-role', {
-        role_id: roleId
-      });
+      // Validate role with backend
+      const response = await api.post('/auth/verify-role', { role });
 
-      if (response.data.success) {
-        const updatedUser = response.data.user;
-        
-        // Update user and active role
+      if (response.data.success === true) {
+        // Backend validated the role
+        const selectedRole = response.data.active_role;
+
+        // Update active role
+        setActiveRole(selectedRole);
+
+        const updatedUser = {
+          ...user,
+          active_role: selectedRole
+        };
         setUser(updatedUser);
-        setActiveRole(updatedUser.active_role);
-        
-        // Update localStorage
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        
+
         return {
           success: true,
-          user: updatedUser
+          active_role: selectedRole
         };
       } else {
-        throw new Error(response.data.message || 'Selezione ruolo fallita');
+        throw new Error(response.data.error || 'Role selection failed');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Errore durante la selezione del ruolo';
+      const errorMessage = err.response?.data?.error || err.message || 'Error selecting role';
       setError(errorMessage);
       return {
         success: false,
@@ -152,36 +187,40 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 🚪 LOGOUT
+   * LOGOUT
+   * Note: Backend doesn't need logout call (stateless JWT)
    */
   const logout = async () => {
     try {
       setLoading(true);
-      
-      // Call backend logout endpoint
-      await api.post('/auth/logout');
-      
-      // Logout from Supabase
-      await supabase.auth.signOut();
-      
-      // Clear state and localStorage
+
+      // 1. Logout from Supabase (invalidates JWT token)
+      const { error: signOutError } = await supabase.auth.signOut();
+
+      if (signOutError) {
+        console.error('Supabase logout error:', signOutError);
+      }
+
+      // 2. Clear state
       setUser(null);
       setActiveRole(null);
       setError(null);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
+      setSession(null);
       
+      // 3. Clear token from API client
+      setApiToken(null);
+
       return { success: true };
     } catch (err) {
       console.error('Logout error:', err);
-      
-      // Force clear even if API call fails
+
+      // Force clear even if logout fails
       setUser(null);
       setActiveRole(null);
       setError(null);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      
+      setSession(null);
+      setApiToken(null);
+
       return { success: true };
     } finally {
       setLoading(false);
@@ -189,17 +228,42 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 🔍 HELPER: Check if user is authenticated
+   * FETCH USER INFO
+   * Get user data and available roles from backend after login
+   * @returns {Object} userData - User data from backend
+   */
+  const fetchUserInfo = async () => {
+    try {
+      const response = await api.get('/auth/user-info');
+
+      if (response.data.success) {
+        const userData = response.data.user;
+        setUser(userData);
+        
+        // Return userData so caller can use it immediately (state update is async)
+        return userData;
+
+      } else {
+        throw new Error('Unable to retrieve user data');
+      }
+    } catch (backendError) {
+      throw new Error('Server communication error');
+    }
+  };
+
+  /**
+   * HELPER: Check if user is authenticated
    */
   const isAuthenticated = !!user;
 
   /**
-   * 🔍 HELPER: Check if user has active role selected
+   * HELPER: Check if user has active role selected
    */
   const hasActiveRole = !!activeRole;
 
   /**
-   * 🔍 HELPER: Check if user has specific role
+   * HELPER: Check if user has specific role available
+   * @param {string} role - Role to check ('DIRECTOR' | 'ORGANIZER' | 'REFEREE')
    */
   const hasRole = (role) => {
     if (!user) return false;
@@ -207,10 +271,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * 🔍 HELPER: Check if active role matches
+   * HELPER: Check if active role matches
+   * @param {string} role - Role to check
    */
   const isActiveRole = (role) => {
-    return activeRole?.role === role;
+    return activeRole === role;
   };
 
   const value = {
@@ -219,14 +284,15 @@ export const AuthProvider = ({ children }) => {
     activeRole,
     loading,
     error,
+    session,
     isAuthenticated,
     hasActiveRole,
-    
+
     // Actions
-    loginOrganization,
+    login,
     selectRole,
     logout,
-    
+
     // Helpers
     hasRole,
     isActiveRole

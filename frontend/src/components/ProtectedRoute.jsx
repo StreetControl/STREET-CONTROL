@@ -1,6 +1,6 @@
 /**
- * 🛡️ PROTECTED ROUTE COMPONENT
- * Protegge le rotte che richiedono autenticazione e/o ruolo specifico
+ * PROTECTED ROUTE COMPONENT
+ * Protects routes that require authentication and/or specific role
  */
 
 import { Navigate } from 'react-router-dom';

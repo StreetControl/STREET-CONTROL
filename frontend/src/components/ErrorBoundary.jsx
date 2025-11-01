@@ -1,6 +1,6 @@
 /**
- * 🛡️ ERROR BOUNDARY
- * Cattura errori React e previene crash app
+ * ERROR BOUNDARY
+ * Catches React errors and prevents app crashes
  */
 
 import React from 'react';
@@ -12,7 +12,7 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    // Ignora errori da estensioni browser
+    // Ignore browser extension errors
     if (error.message?.includes('message channel closed')) {
       return { hasError: false };
     }
@@ -20,7 +20,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Ignora errori da estensioni
+    // Ignore errors from extensions
     if (error.message?.includes('message channel closed')) {
       return;
     }

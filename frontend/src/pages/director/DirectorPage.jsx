@@ -1,6 +1,5 @@
 /**
- * 🎬 DIRECTOR PAGE (REGISTA)
- * Placeholder - Coming soon
+ * DIRECTOR PAGE
  */
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,7 +30,7 @@ const DirectorPage = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-dark-text">REGISTA</h1>
-              <p className="text-sm text-dark-text-secondary">{user?.organization_name}</p>
+              <p className="text-sm text-dark-text-secondary">{user?.name}</p>
             </div>
           </div>
           <div className="flex gap-3">

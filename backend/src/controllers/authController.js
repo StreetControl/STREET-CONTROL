@@ -90,6 +90,24 @@ export async function getUserInfos(req, res) {
       })
     }
 
+    // Extract judge-specific role if user is a judge
+    let judgeRole = null; // Default value for non-judges
+    console.log('User role:', user.role);
+    if (user.role === 'REFEREE') {
+      const { data: judgeData, error: judgeError } = await supabaseAdmin
+      .from('judges')
+      .select('role')
+      .eq('user_id', user.id)
+      .single()
+
+      console.log('Judge data:', judgeData);
+      console.log('Judge error:', judgeError);
+
+      if (!judgeError && judgeData) {
+        judgeRole = judgeData.role
+      }
+    }
+
     // Determine available roles based on user's DB role
     const availableRoles = [];
     const rolesList = [
@@ -112,6 +130,7 @@ export async function getUserInfos(req, res) {
         name: getDisplayName(user.name),
         role: user.role,
         available_roles: availableRoles,
+        judge_position: judgeRole || null
       }
     })
 

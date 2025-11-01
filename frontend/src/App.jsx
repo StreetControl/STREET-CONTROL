@@ -1,5 +1,5 @@
 /**
- * 🗺️ STREET CONTROL - APP ROUTING
+ * STREET CONTROL - APP ROUTING
  */
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -10,13 +10,13 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/auth/LoginPage';
 import SelectRolePage from './pages/auth/SelectRolePage';
 
-// Role-specific Pages (placeholders for now)
+// Role-specific Pages
 import DirectorPage from './pages/director/DirectorPage';
 import OrganizerPage from './pages/organizer/OrganizerPage';
 import RefereePage from './pages/judge/RefereePage';
 
 function App() {
-  const { isAuthenticated, hasActiveRole } = useAuth();
+  const { isAuthenticated, hasActiveRole, activeRole } = useAuth();
 
   return (
     <Router>
@@ -26,7 +26,7 @@ function App() {
           path="/login" 
           element={
             isAuthenticated ? (
-              hasActiveRole ? <Navigate to="/" replace /> : <Navigate to="/select-role" replace />
+              <Navigate to="/select-role" replace />
             ) : (
               <LoginPage />
             )
@@ -78,7 +78,15 @@ function App() {
           path="/" 
           element={
             isAuthenticated ? (
-              hasActiveRole ? <Navigate to="/select-role" replace /> : <Navigate to="/select-role" replace />
+              hasActiveRole ? (
+                // If already has active role, redirect to role page
+                activeRole?.role === 'DIRECTOR' ? <Navigate to="/director" replace /> :
+                activeRole?.role === 'ORGANIZER' ? <Navigate to="/organizer" replace /> :
+                activeRole?.role === 'REFEREE' ? <Navigate to="/referee" replace /> :
+                <Navigate to="/select-role" replace />
+              ) : (
+                <Navigate to="/select-role" replace />
+              )
             ) : (
               <Navigate to="/login" replace />
             )
