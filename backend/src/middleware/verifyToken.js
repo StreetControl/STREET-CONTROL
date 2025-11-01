@@ -1,132 +1,81 @@
 /**
- * 🛡️ VERIFY TOKEN MIDDLEWARE
+ * VERIFY TOKEN MIDDLEWARE
  * 
- * Middleware per verificare JWT token Supabase
- * Protegge route che richiedono autenticazione
+ * Middleware to verify Supabase JWT token
+ * Protects routes that require authentication
+ * 
+ * Uses LOCAL JWT validation
  */
 
-import { supabase } from '../services/supabase.js'
+import jwt from 'jsonwebtoken'
 
 /**
- * Verifica validità token JWT Supabase
+ * Verifies Supabase JWT token validity LOCALLY
  * 
- * Estrae token da header Authorization: "Bearer <token>"
- * Verifica con Supabase auth.getUser()
- * Se valido: popola req.user e passa al next()
- * Se invalido: risponde 401 Unauthorized
+ * Extracts token from Authorization header: "Bearer <token>"
+ * Verifies with jwt.verify() using SUPABASE_JWT_SECRET
+ * If valid: populates req.user and passes to next()
+ * If invalid: responds with 401 Unauthorized
  */
 export async function verifyToken(req, res, next) {
   try {
-    // 1. Estrae token da header Authorization
+    // 1. Extract token from Authorization header
     const authHeader = req.headers.authorization
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ 
-        error: 'Token mancante. Effettua il login.' 
+        error: 'Missing token. Please login.' 
       })
     }
 
     const token = authHeader.split(' ')[1]
 
-    // 2. Verifica token con Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-
-    if (error || !user) {
-      console.error('❌ Token verification failed:', error?.message)
-      return res.status(401).json({ 
-        error: 'Token non valido o scaduto. Effettua nuovamente il login.' 
-      })
+    // 2. Verify token LOCALLY with JWT_SECRET
+    if (!process.env.SUPABASE_JWT_SECRET) {
+      throw new Error('SUPABASE_JWT_SECRET not configured in .env')
     }
 
-    // 3. Popola req.user con dati utente
-    req.user = user
+    const decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET)
+
+    // 3. Populate req.user with decoded token data
+    req.user = {
+      id: decoded.sub,              // Supabase auth.users.id
+      email: decoded.email,
+      role: decoded.role,
+      user_metadata: decoded.user_metadata || {},
+      app_metadata: decoded.app_metadata || {}
+    }
+    
     req.token = token
 
-    // Debug log (rimuovi in produzione)
-    console.log(`✅ Token verified: User ${user.email}`)
+    // Debug log
+    console.log(`Token verified (LOCAL): User ${decoded.email}`)
 
-    // 4. Passa al controller
+    // 4. Pass to controller
     next()
 
   } catch (error) {
-    console.error('❌ Verify token error:', error)
+    // Handle specific JWT errors
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        error: 'Token expired. Please login again.' 
+      })
+    }
+    
+    if (error.name === 'JsonWebTokenError') {
+      console.error('JWT verification failed:', error.message)
+      return res.status(401).json({ 
+        error: 'Invalid token. Please login again.' 
+      })
+    }
+
+    console.error('Verify token error:', error)
     res.status(500).json({ 
-      error: 'Errore interno durante verifica token' 
+      error: 'Internal error during token verification' 
     })
   }
 }
 
-/**
- * Middleware per verificare ruolo specifico
- * 
- * Uso:
- * router.post('/director/action', verifyToken, requireRole(['DIRECTOR']), controller)
- */
-export function requireRole(allowedRoles) {
-  return async (req, res, next) => {
-    try {
-      const authUser = req.user
-
-      if (!authUser) {
-        return res.status(401).json({ 
-          error: 'Autenticazione richiesta' 
-        })
-      }
-
-      // Query user da DB
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('auth_uid', authUser.id)
-        .single()
-
-      if (error || !user) {
-        return res.status(404).json({ 
-          error: 'Utente non trovato' 
-        })
-      }
-
-      // Verifica ruolo
-      if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({ 
-          error: `Accesso negato. Ruolo richiesto: ${allowedRoles.join(' o ')}` 
-        })
-      }
-
-      // Passa al controller
-      next()
-
-    } catch (error) {
-      console.error('❌ Require role error:', error)
-      res.status(500).json({ 
-        error: 'Errore interno durante verifica permessi' 
-      })
-    }
-  }
-}
-
-/**
- * Middleware per verificare active_role (per azioni specifiche)
- * 
- * Esempio: Solo chi ha selezionato ruolo DIRECTOR può premere NEXT
- */
-export function requireActiveRole(allowedActiveRoles) {
-  return (req, res, next) => {
-    const authUser = req.user
-    const activeRole = authUser?.user_metadata?.active_role
-
-    if (!activeRole || !allowedActiveRoles.includes(activeRole)) {
-      return res.status(403).json({ 
-        error: `Azione riservata a: ${allowedActiveRoles.join(' o ')}` 
-      })
-    }
-
-    next()
-  }
-}
-
 export default {
-  verifyToken,
-  requireRole,
-  requireActiveRole
+  verifyToken
 }

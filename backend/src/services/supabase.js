@@ -1,48 +1,44 @@
 /**
- * 🔥 SUPABASE CLIENTS - Backend
+ * SUPABASE CLIENT - Backend
  * 
- * DUE client Supabase:
- * 1. supabaseAdmin (SERVICE_ROLE_KEY) - Per query al DB che bypassano RLS
- * 2. supabaseAuth (ANON_KEY) - Per autenticazione (signInWithPassword)
+ * Backend uses ONLY supabaseAdmin (SERVICE_ROLE_KEY):
+ * - Bypasses Row Level Security (RLS)
+ * - Permissions managed manually in code
+ * - JWT verification handled by verifyToken middleware
  * 
- * QUANDO USARE:
- * - supabaseAuth: Login, signup, password reset
- * - supabaseAdmin: Query al database, operazioni privilegiate
+ * AUTHENTICATION:
+ * - Login/Logout handled by FRONTEND (Supabase client-side)
+ * - Backend receives and verifies JWT token via middleware
  * 
- * ⚠️ SICUREZZA: SERVICE_KEY mai esporre al frontend!
+ * SECURITY: 
+ * - Never expose SERVICE_ROLE_KEY to frontend
+ * - Always validate user permissions before DB queries
+ * - Use RLS policies as additional security layer
  */
 
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 
-// Carica variabili ambiente
+// Load environment variables
 dotenv.config()
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
 
-// Validazione
-if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+// Validation
+if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error(
-    '❌ Missing Supabase environment variables!\n' +
-    'Assicurati che SUPABASE_URL, SUPABASE_SERVICE_KEY e SUPABASE_ANON_KEY siano in .env'
+    'Missing Supabase environment variables!\n' +
+    'Make sure SUPABASE_URL and SUPABASE_SERVICE_KEY are set in .env'
   )
 }
 
-// Client per AUTENTICAZIONE (usa ANON_KEY)
-export const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false
-  },
-  db: {
-    schema: 'public'
-  }
-})
-
-// Client per DATABASE (usa SERVICE_ROLE_KEY, bypassa RLS)
+/**
+ * SUPABASE ADMIN CLIENT
+ * 
+ * Uses SERVICE_ROLE_KEY - Bypasses RLS
+ * Permissions must be managed manually in code
+ */
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
@@ -51,20 +47,10 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   },
   db: {
     schema: 'public'
-  },
-  global: {
-    headers: {
-      'apikey': supabaseServiceKey
-    }
   }
 })
 
-// Export default per retrocompatibilità (usa Admin)
-export const supabase = supabaseAdmin
+// Export default
+export default supabaseAdmin
 
-// Export anche URL per debug
-export const SUPABASE_URL = supabaseUrl
-
-console.log('✅ Supabase backend client initialized')
-
-export default supabase
+console.log('Supabase backend client initialized')

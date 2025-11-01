@@ -1,60 +1,36 @@
 /**
- * 👥 SELECT ROLE PAGE
- * Layout esatto del mockup fornito dall'utente
+ * SELECT ROLE PAGE
  */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Settings, Users, Gavel, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { roleConfig } from '../../utils/config';
+
 
 const SelectRolePage = () => {
   const navigate = useNavigate();
-  const { user, selectRole, loading, logout } = useAuth();
+  const { user, selectRole, loading, logout} = useAuth();
   const [selectedRole, setSelectedRole] = useState(null);
   const [error, setError] = useState('');
 
-  // Role configuration con ordine di visualizzazione
-  const roleConfig = {
-    'ORGANIZER': {
-      title: 'PRE-GARA',
-      subtitle: 'Configura atleti e parametri',
-      icon: Users,
-      color: 'from-green-500/20 to-green-600/20',
-      borderColor: 'border-green-500/30',
-      iconColor: 'text-green-400',
-      order: 1
-    },
-    'DIRECTOR': {
-      title: 'REGISTA',
-      subtitle: 'Gestisci il flusso della gara',
-      icon: Settings,
-      color: 'from-blue-500/20 to-blue-600/20',
-      borderColor: 'border-blue-500/30',
-      iconColor: 'text-blue-400',
-      order: 2
-    },
-    'REFEREE': {
-      title: 'GIUDICE',
-      subtitle: user?.judge_position ? `Posizione: ${user.judge_position}` : 'Valuta le alzate',
-      icon: Gavel,
-      color: 'from-purple-500/20 to-purple-600/20',
-      borderColor: 'border-purple-500/30',
-      iconColor: 'text-purple-400',
-      order: 3
-    }
-  };
 
-  // Ordina i ruoli disponibili
-  const sortedRoles = user.available_roles?.sort((a, b) => {
-    return roleConfig[a.role]?.order - roleConfig[b.role]?.order;
+  // Get role configuration
+  const roles = roleConfig(user);
+
+  // Sort available roles
+  const sortedRoles = user?.available_roles?.sort((a, b) => {
+    return roles[a.role]?.order - roles[b.role]?.order;
   }) || [];
 
   const handleRoleSelect = async (role) => {
     setError('');
     setSelectedRole(role.role);
-
-    const result = await selectRole(role.id);
+    console.log(`Selecting role: ${role.role}`)
+    
+    // Pass role string (not ID) to backend
+    const result = await selectRole(role.role);
 
     if (result.success) {
       // Navigate based on selected role
@@ -93,7 +69,7 @@ const SelectRolePage = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-dark-text">
-            Benvenuto, <span className="text-primary">{user.organization_name || 'Organizzazione'}</span>
+            Benvenuto, <span className="text-primary">{user.name}</span>
           </h1>
           <p className="text-dark-text-secondary text-lg">
             Seleziona il tuo ruolo per accedere alla piattaforma
@@ -108,6 +84,18 @@ const SelectRolePage = () => {
           </div>
         )}
 
+        {/* No Roles Available */}
+        {sortedRoles.length === 0 && (
+          <div className="max-w-2xl mx-auto mb-8 p-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <p className="text-yellow-400 text-center">
+              ⚠️ Nessun ruolo disponibile per questo utente. Contatta l&apos;amministratore.
+            </p>
+            <p className="text-dark-text-secondary text-sm text-center mt-2">
+              User role: {user?.role || 'N/A'}
+            </p>
+          </div>
+        )}
+
         {/* Role Cards Grid */}
         <div className={`grid grid-cols-1 gap-6 mb-8 ${
           sortedRoles.length === 1 
@@ -115,7 +103,7 @@ const SelectRolePage = () => {
             : 'md:grid-cols-3'
         }`}>
           {sortedRoles.map((role) => {
-            const config = roleConfig[role.role];
+            const config = roles[role.role];
             if (!config) return null;
 
             const Icon = config.icon;

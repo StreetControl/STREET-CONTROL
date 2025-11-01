@@ -1,6 +1,5 @@
 /**
- * 🔐 LOGIN PAGE
- * Layout esatto del mockup fornito dall'utente
+ * LOGIN PAGE
  */
 
 import { useState } from 'react';
@@ -10,7 +9,7 @@ import { ArrowRight } from 'lucide-react';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { loginOrganization, loading } = useAuth();
+  const { login, loading } = useAuth();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -30,30 +29,11 @@ const LoginPage = () => {
     e.preventDefault();
     setError('');
 
-    const result = await loginOrganization(formData.email, formData.password);
+    // Login with Supabase + fetch roles from backend
+    const result = await login(formData.email, formData.password);
 
     if (result.success) {
-      if (result.requiresRoleSelection) {
-        // Multiple roles → go to role selection
-        navigate('/select-role');
-      } else {
-        // Single role → redirect based on role
-        const role = result.user.available_roles[0]?.role;
-        
-        switch(role) {
-          case 'DIRECTOR':
-            navigate('/director');
-            break;
-          case 'ORGANIZER':
-            navigate('/organizer');
-            break;
-          case 'REFEREE':
-            navigate('/referee');
-            break;
-          default:
-            navigate('/');
-        }
-      }
+      navigate('/select-role');
     } else {
       setError(result.message);
     }
@@ -74,7 +54,7 @@ const LoginPage = () => {
           <div className="relative inline-block mb-6 group">
             <img 
               src="/src/assets/images/streetControlLogo.svg" 
-              alt="SLI Logo" 
+              alt="Street Control Logo" 
               className="w-40 h-40 relative z-10
                          drop-shadow-[0_0_20px_rgba(167,139,250,0.4)]
                          group-hover:drop-shadow-[0_0_30px_rgba(167,139,250,0.7)]
@@ -124,7 +104,7 @@ const LoginPage = () => {
                 value={formData.email}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="Scrivi qua la tua e-mail"
+                placeholder="Inserisci e-mail"
                 required
                 autoFocus
                 disabled={loading}

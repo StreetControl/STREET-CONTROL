@@ -1,6 +1,6 @@
 /**
- * 📋 ORGANIZER PAGE (PRE-GARA)
- * Placeholder - Coming soon
+ * ORGANIZER PAGE 
+ * TODO 
  */
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,7 +31,7 @@ const OrganizerPage = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-dark-text">PRE-GARA</h1>
-              <p className="text-sm text-dark-text-secondary">{user?.organization_name}</p>
+              <p className="text-sm text-dark-text-secondary">{user?.name}</p>
             </div>
           </div>
           <div className="flex gap-3">

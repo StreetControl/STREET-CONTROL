@@ -1,12 +1,5 @@
 /**
- * 🚀 STREET CONTROL - BACKEND SERVER
- * 
- * Server Express per gestione gare Streetlifting
- * 
- * Stack:
- * - Express (Web framework)
- * - Supabase (Database + Auth + Realtime)
- * - WebSocket (Eventi custom real-time)
+ * STREET CONTROL - BACKEND SERVER
  */
 
 import express from 'express'
@@ -19,18 +12,18 @@ import dotenv from 'dotenv'
 // Import routes
 import authRoutes from './routes/auth.js'
 
-// Carica variabili ambiente
+// Load environment variables
 dotenv.config()
 
 // ============================================
-// CONFIGURAZIONE EXPRESS
+// EXPRESS CONFIGURATION
 // ============================================
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
 // ============================================
-// MIDDLEWARE GLOBALI
+// GLOBAL MIDDLEWARE
 // ============================================
 
 // 1. Security headers
@@ -40,7 +33,7 @@ app.use(helmet())
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
 app.use(cors({
   origin: (origin, callback) => {
-    // Permetti richieste senza origin (es. Postman, mobile)
+    // Allow requests without origin (e.g., Postman, mobile apps)
     if (!origin) return callback(null, true)
     
     if (allowedOrigins.includes(origin)) {
@@ -63,12 +56,12 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'))
 }
 
-// 5. Rate limiting (solo in produzione)
+// 5. Rate limiting (production only)
 if (process.env.NODE_ENV === 'production') {
   const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minuti
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-    message: 'Troppe richieste da questo IP, riprova più tardi'
+    message: 'Too many requests from this IP, please try again later'
   })
   app.use('/api/', limiter)
 }
@@ -101,11 +94,6 @@ app.get('/api/health', (req, res) => {
 // Auth routes
 app.use('/api/auth', authRoutes)
 
-// TODO: Altre routes da implementare nelle prossime fasi
-// app.use('/api/meets', meetRoutes)
-// app.use('/api/athletes', athleteRoutes)
-// app.use('/api/votes', voteRoutes)
-// app.use('/api/director', directorRoutes)
 
 // ============================================
 // ERROR HANDLING
@@ -114,17 +102,19 @@ app.use('/api/auth', authRoutes)
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    error: 'Endpoint non trovato',
-    path: req.path
+    error: 'Not Found',
+    message: `The requested endpoint '${req.method} ${req.path}' does not exist`,
+    path: req.path,
+    method: req.method
   })
 })
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Global error:', err)
+  console.error('Global error:', err)
   
   res.status(err.status || 500).json({
-    error: err.message || 'Errore interno del server',
+    error: err.message || 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   })
 })
@@ -134,22 +124,22 @@ app.use((err, req, res, next) => {
 // ============================================
 
 app.listen(PORT, () => {
-  console.log('🚀 ============================================')
+  console.log('============================================')
   console.log(`🏋️  Street Control Backend`)
   console.log(`📡 Server running on port ${PORT}`)
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`🔗 Health check: http://localhost:${PORT}/api/health`)
-  console.log('🚀 ============================================')
+  console.log('============================================')
 })
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully...')
+  console.log('SIGTERM received, shutting down gracefully...')
   process.exit(0)
 })
 
 process.on('SIGINT', () => {
-  console.log('👋 SIGINT received, shutting down gracefully...')
+  console.log('SIGINT received, shutting down gracefully...')
   process.exit(0)
 })
 

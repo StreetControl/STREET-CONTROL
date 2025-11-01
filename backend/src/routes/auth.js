@@ -1,64 +1,38 @@
 /**
- * 🔐 AUTH ROUTES
+ * AUTH ROUTES
  * 
- * Gestisce autenticazione a 2 step:
- * 1. Login organizzazione (email + password)
- * 2. Selezione ruolo (Director/Judge/Organizer)
+ * Manages 2-step authentication:
+ * 1. Organization login (email + password)
+ * 2. Role selection (Director/Referee/Organizer)
  */
 
 import express from 'express'
-import { 
-  loginOrganization, 
-  selectRole,
-  logout,
-  verifySession
-} from '../controllers/authController.js'
+import { verifyRole, getUserInfos } from '../controllers/authController.js'
 import { verifyToken } from '../middleware/verifyToken.js'
 
 const router = express.Router()
-
-// ============================================
-// PUBLIC ROUTES (No auth required)
-// ============================================
-
-/**
- * POST /api/auth/login
- * STEP 1: Login con credenziali organizzazione
- * 
- * Body: { email, password }
- * Response: { token, user: { id, name, role, email } }
- */
-router.post('/login', loginOrganization)
 
 // ============================================
 // PROTECTED ROUTES (Require token)
 // ============================================
 
 /**
- * POST /api/auth/select-role
- * STEP 2: Seleziona ruolo operativo
+ * POST /api/auth/verify-role
+ * Validates if the requested role is available for the user
  * 
  * Headers: { Authorization: "Bearer <token>" }
- * Body: { role: "DIRECTOR" | "REFEREE" | "ORGANIZER", meet_id?, judge_name? }
- * Response: { token, active_role, ... }
+ * Body: { role: "DIRECTOR" | "REFEREE" | "ORGANIZER" }
+ * Response: { valid: boolean }
  */
-router.post('/select-role', verifyToken, selectRole)
+router.post('/verify-role', verifyToken, verifyRole)
 
 /**
- * POST /api/auth/logout
- * Termina sessione
+ * GET /api/auth/user-info
+ * Returns the authenticated user's information including available roles
  * 
  * Headers: { Authorization: "Bearer <token>" }
+ * Response: { user: { id: string, name: string, role: string, roles: Array<string> } }
  */
-router.post('/logout', verifyToken, logout)
-
-/**
- * GET /api/auth/verify
- * Verifica validità token + restituisce user info
- * 
- * Headers: { Authorization: "Bearer <token>" }
- * Response: { user: { ... } }
- */
-router.get('/verify', verifyToken, verifySession)
+router.get('/user-info', verifyToken, getUserInfos)
 
 export default router

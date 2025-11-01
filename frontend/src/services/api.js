@@ -1,145 +1,128 @@
 /**
- * 🌐 BACKEND API CLIENT
+ * BACKEND API CLIENT
  * 
- * Client HTTP configurato per comunicare con il backend Express.
- * Usa Axios con interceptors per gestire autenticazione e errori.
+ * HTTP client configured to communicate with Express backend.
+ * Uses Axios with interceptors for authentication and error handling.
  * 
- * ESEMPIO USO:
+ * USAGE EXAMPLE:
  * 
  * import api from '@/services/api'
  * 
- * // Chiamate autenticate (token automatico)
- * const response = await api.post('/auth/login', { email, password })
+ * // Authenticated calls (token automatic)
+ * const response = await api.post('/auth/verify-role', { role: 'DIRECTOR' })
  * const data = await api.get('/meets')
  */
 
-import axios from 'axios';
+import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api'
 
-// Crea istanza Axios
+// Create Axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
   }
-});
+})
 
-// 📤 REQUEST INTERCEPTOR - Aggiungi token a ogni richiesta
+// Store token in memory (set by AuthContext)
+let currentToken = null
+
+/**
+ * Set the authentication token (called by AuthContext)
+ * @param {string|null} token - JWT token or null to clear
+ */
+export function setApiToken(token) {
+  currentToken = token
+}
+
+// REQUEST INTERCEPTOR - Add token to every request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    // Use in-memory token (fallback to localStorage for backwards compatibility)
+    const token = currentToken || localStorage.getItem('authToken')
     
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`
     }
     
-    return config;
+    return config
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(error)
   }
-);
+)
 
-// 📥 RESPONSE INTERCEPTOR - Gestisci errori globali
+// RESPONSE INTERCEPTOR - Handle global errors
 api.interceptors.response.use(
   (response) => {
-    return response;
+    return response
   },
   (error) => {
-    // Token scaduto o invalido
+    // Token expired or invalid
     if (error.response?.status === 401) {
-      // Clear auth data
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
       
-      // Redirect to login (solo se non siamo già lì)
+      // Redirect to login (only if not already there)
       if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+        window.location.href = '/login'
       }
     }
     
     // Server error
     if (error.response?.status >= 500) {
-      console.error('Server error:', error.response);
+      console.error('Server error:', error.response)
     }
     
-    return Promise.reject(error);
+    return Promise.reject(error)
   }
-);
-
-/**
- * Helper per fetch con error handling (LEGACY - deprecato)
- */
-async function apiRequest(endpoint, options = {}) {
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      ...options
-    })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Unknown error' }))
-      throw new Error(error.message || `HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error(`API Error [${endpoint}]:`, error)
-    throw error
-  }
-}
+)
 
 // ============================================
 // VOTES API
 // ============================================
 
 /**
- * Invia voto giudice (gestisce logica 2/3)
+ * Submit judge vote (handles 2/3 logic)
  */
 export async function submitVote({ attempt_id, judge_id, vote }) {
-  return apiRequest('/api/votes', {
-    method: 'POST',
-    body: JSON.stringify({ attempt_id, judge_id, vote })
-  })
+  const response = await api.post('/votes', { attempt_id, judge_id, vote })
+  return response.data
 }
 
 // ============================================
-// DIRECTOR API (Regista)
+// DIRECTOR API
 // ============================================
 
 /**
- * Avanza al prossimo atleta (pulsante NEXT)
+ * Advance to next athlete (NEXT button)
  */
 export async function advanceToNextAthlete({ meet_id }) {
-  return apiRequest('/api/director/next', {
-    method: 'POST',
-    body: JSON.stringify({ meet_id })
-  })
+  const response = await api.post('/director/next', { meet_id })
+  return response.data
 }
 
 /**
- * Modifica esito alzata (VAR)
+ * Override lift result (VAR)
  */
 export async function overrideAttemptResult({ attempt_id, new_result, reason }) {
-  return apiRequest('/api/director/override', {
-    method: 'POST',
-    body: JSON.stringify({ attempt_id, new_result, reason })
+  const response = await api.post('/director/override', { 
+    attempt_id, 
+    new_result, 
+    reason 
   })
+  return response.data
 }
 
 /**
- * Aggiorna peso dichiarato
+ * Update declared weight
  */
 export async function updateDeclaredWeight({ attempt_id, weight }) {
-  return apiRequest('/api/director/update-weight', {
-    method: 'PATCH',
-    body: JSON.stringify({ attempt_id, weight })
+  const response = await api.patch('/director/update-weight', { 
+    attempt_id, 
+    weight 
   })
+  return response.data
 }
 
 // ============================================
@@ -147,20 +130,27 @@ export async function updateDeclaredWeight({ attempt_id, weight }) {
 // ============================================
 
 /**
- * Crea nuova gara
+ * Create new meet
  */
 export async function createMeet(meetData) {
-  return apiRequest('/api/meets', {
-    method: 'POST',
-    body: JSON.stringify(meetData)
-  })
+  const response = await api.post('/meets', meetData)
+  return response.data
 }
 
 /**
- * Ottieni dettagli gara
+ * Get meet details
  */
 export async function getMeet(meetId) {
-  return apiRequest(`/api/meets/${meetId}`)
+  const response = await api.get(`/meets/${meetId}`)
+  return response.data
+}
+
+/**
+ * Get all meets
+ */
+export async function getMeets() {
+  const response = await api.get('/meets')
+  return response.data
 }
 
 // ============================================
@@ -168,27 +158,33 @@ export async function getMeet(meetId) {
 // ============================================
 
 /**
- * Aggiungi atleta
+ * Add athlete
  */
 export async function addAthlete(athleteData) {
-  return apiRequest('/api/athletes', {
-    method: 'POST',
-    body: JSON.stringify(athleteData)
-  })
+  const response = await api.post('/athletes', athleteData)
+  return response.data
 }
 
 /**
- * Aggiorna peso corporeo (pesatura)
+ * Update athlete body weight (weigh-in)
  */
 export async function updateAthleteWeight({ athlete_id, body_weight }) {
-  return apiRequest(`/api/athletes/${athlete_id}/weight`, {
-    method: 'PATCH',
-    body: JSON.stringify({ body_weight })
+  const response = await api.patch(`/athletes/${athlete_id}/weight`, { 
+    body_weight 
   })
+  return response.data
+}
+
+/**
+ * Get athletes list
+ */
+export async function getAthletes() {
+  const response = await api.get('/athletes')
+  return response.data
 }
 
 // ============================================
-// EXPORT DEFAULT - Axios instance
+// EXPORT DEFAULT
 // ============================================
 
-export default api;
+export default api

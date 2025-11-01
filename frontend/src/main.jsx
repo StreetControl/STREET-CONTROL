@@ -1,5 +1,5 @@
 /**
- * 🚀 STREET CONTROL - ENTRY POINT
+ * STREET CONTROL - ENTRY POINT
  */
 
 import React from 'react';

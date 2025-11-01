@@ -1,6 +1,6 @@
 /**
- * ⚖️ REFEREE PAGE (GIUDICE)
- * Placeholder - Coming soon
+ * REFEREE PAGE 
+ * 
  */
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,7 +35,7 @@ const RefereePage = () => {
             <div>
               <h1 className="text-xl font-bold text-dark-text">GIUDICE</h1>
               <p className="text-sm text-dark-text-secondary">
-                {user?.organization_name} • Posizione: {judgePosition}
+                {user?.name} • Posizione: {judgePosition}
               </p>
             </div>
           </div>
@@ -67,7 +67,7 @@ const RefereePage = () => {
           </div>
           <p className="text-dark-text-secondary mb-8 max-w-2xl mx-auto">
             Questa sezione sarà utilizzata per valutare le performance degli atleti durante la competizione.
-            Il sistema fornirà un'interfaccia dedicata per esprimere i giudizi in tempo reale.
+            Il sistema fornirà un interfaccia dedicata per esprimere i giudizi in tempo reale.
           </p>
           <div className="inline-flex items-center gap-2 text-primary">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
