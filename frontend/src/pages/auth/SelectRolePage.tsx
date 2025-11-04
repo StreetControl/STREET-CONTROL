@@ -34,20 +34,8 @@ const SelectRolePage = () => {
     const result = await selectRole(role.role);
 
     if (result.success) {
-      // Navigate based on selected role
-      switch(role.role) {
-        case 'DIRECTOR':
-          navigate('/director');
-          break;
-        case 'ORGANIZER':
-          navigate('/organizer');
-          break;
-        case 'REFEREE':
-          navigate('/referee');
-          break;
-        default:
-          navigate('/');
-      }
+      // All roles navigate to meets list
+      navigate('/meets');
     } else {
       setError(result.message || 'Errore nella selezione del ruolo');
       setSelectedRole(null);

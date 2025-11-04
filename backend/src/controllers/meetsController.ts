@@ -1,0 +1,300 @@
+/**
+ * MEETS CONTROLLER
+ * Handles competition/meet management operations
+ */
+
+import { Response } from 'express';
+import { supabaseAdmin } from '../services/supabase.js';
+import type { AuthRequest } from '../types';
+
+/**
+ * ============================================
+ * GET MEETS
+ * ============================================
+ * 
+ * Returns all meets for the authenticated user's federation
+ * Sorted by start_date descending (newest first)
+ */
+export async function getMeets(req: AuthRequest, res: Response): Promise<Response> {
+  try {
+    const authUser = req.user;
+
+    if (!authUser) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Unauthorized' 
+      });
+    }
+
+    // Get user from DB
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('auth_uid', authUser.auth_uid)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
+    }
+
+    // Get all federation_ids for this user via user_federations junction table
+    const { data: userFederations, error: ufError } = await supabaseAdmin
+      .from('user_federations')
+      .select('federation_id')
+      .eq('user_id', user.id);
+
+    if (ufError) {
+      console.error('Error fetching user federations:', ufError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch user federations' 
+      });
+    }
+
+    if (!userFederations || userFederations.length === 0) {
+      // User not associated with any federation
+      return res.json({
+        success: true,
+        meets: []
+      });
+    }
+
+    // Extract federation IDs
+    const federationIds = userFederations.map(uf => uf.federation_id);
+
+    // Fetch all meets for these federations
+    const { data: meets, error: meetsError } = await supabaseAdmin
+      .from('meets')
+      .select(`
+        id,
+        federation_id,
+        meet_code,
+        name,
+        start_date,
+        level,
+        regulation_code,
+        meet_type_id,
+        meet_types (
+          id,
+          name
+        )
+      `)
+      .in('federation_id', federationIds)
+      .order('start_date', { ascending: false });
+
+    if (meetsError) {
+      console.error('Error fetching meets:', meetsError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch meets' 
+      });
+    }
+
+    // Add status field based on start_date
+    const meetsWithStatus = (meets || []).map(meet => {
+      const startDate = new Date(meet.start_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED';
+      
+      if (startDate > today) {
+        status = 'SETUP'; // Future meet
+      } else if (startDate.toDateString() === today.toDateString()) {
+        status = 'IN_PROGRESS'; // Today
+      } else {
+        status = 'COMPLETED'; // Past
+      }
+
+      return {
+        ...meet,
+        status
+      };
+    });
+
+    return res.json({
+      success: true,
+      meets: meetsWithStatus
+    });
+
+  } catch (error) {
+    console.error('Get meets error:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+}
+
+/**
+ * ============================================
+ * CREATE MEET
+ * ============================================
+ * 
+ * Creates a new meet for the authenticated user's federation
+ */
+export async function createMeet(req: AuthRequest, res: Response): Promise<Response> {
+  try {
+    const authUser = req.user;
+
+    if (!authUser) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Unauthorized' 
+      });
+    }
+
+    // Get user from DB
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('auth_uid', authUser.auth_uid)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
+    }
+
+    // Get user's primary federation (first one if multiple)
+    const { data: userFederations, error: ufError } = await supabaseAdmin
+      .from('user_federations')
+      .select('federation_id, federations(id, name, code)')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+
+    if (ufError || !userFederations) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'User not associated with any federation' 
+      });
+    }
+
+    const federation = userFederations.federations as any;
+    const federation_id = userFederations.federation_id;
+
+    // Extract request body
+    const { name, meet_type_id, start_date, level, regulation_code } = req.body;
+
+    // Validation
+    if (!name || !meet_type_id || !start_date || !level || !regulation_code) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields: name, meet_type_id, start_date, level, regulation_code' 
+      });
+    }
+
+    // Validate meet_type_id exists
+    const { data: meetType, error: meetTypeError } = await supabaseAdmin
+      .from('meet_types')
+      .select('id')
+      .eq('id', meet_type_id)
+      .single();
+
+    if (meetTypeError || !meetType) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid meet_type_id' 
+      });
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(start_date)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid date format. Use YYYY-MM-DD' 
+      });
+    }
+
+    // Validate level
+    if (!['REGIONALE', 'NAZIONALE'].includes(level)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid level. Must be REGIONALE or NAZIONALE' 
+      });
+    }
+
+    // Generate unique meet_code
+    // Format: FEDERATION_CODE-YYYY-NN
+    // Example: SLI-2025-01
+    const federationCode = federation.code || 'XXX';
+    const year = start_date.split('-')[0];
+    const randomNum = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    const meet_code = `${federationCode}-${year}-${randomNum}`;
+
+    // Insert meet
+    const { data: newMeet, error: insertError } = await supabaseAdmin
+      .from('meets')
+      .insert({
+        federation_id,
+        meet_code,
+        name,
+        start_date,
+        level,
+        regulation_code,
+        meet_type_id
+      })
+      .select(`
+        id,
+        federation_id,
+        meet_code,
+        name,
+        start_date,
+        level,
+        regulation_code,
+        meet_type_id
+      `)
+      .single();
+
+    if (insertError) {
+      console.error('Error creating meet:', insertError);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to create meet' 
+      });
+    }
+
+    // Add status field
+    const startDate = new Date(newMeet.start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED';
+    
+    if (startDate > today) {
+      status = 'SETUP';
+    } else if (startDate.toDateString() === today.toDateString()) {
+      status = 'IN_PROGRESS';
+    } else {
+      status = 'COMPLETED';
+    }
+
+    return res.status(201).json({
+      success: true,
+      meet: {
+        ...newMeet,
+        status
+      },
+      message: 'Meet created successfully'
+    });
+
+  } catch (error) {
+    console.error('Create meet error:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+}
+
+export default {
+  getMeets,
+  createMeet
+};

@@ -10,13 +10,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/auth/LoginPage';
 import SelectRolePage from './pages/auth/SelectRolePage';
 
-// Role-specific Pages
-import DirectorPage from './pages/director/DirectorPage';
-import OrganizerPage from './pages/organizer/OrganizerPage';
-import RefereePage from './pages/judge/RefereePage';
+// Main Pages
+import MeetListPage from './pages/MeetListPage';
 
 function App() {
-  const { isAuthenticated, hasActiveRole, activeRole } = useAuth();
+  const { isAuthenticated, hasActiveRole } = useAuth();
 
   return (
     <Router>
@@ -43,32 +41,12 @@ function App() {
           } 
         />
 
-        {/* DIRECTOR Routes */}
+        {/* MEETS Routes - All roles access this */}
         <Route 
-          path="/director/*" 
+          path="/meets/*" 
           element={
-            <ProtectedRoute requireRole="DIRECTOR" requireActiveRole>
-              <DirectorPage />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* ORGANIZER Routes */}
-        <Route 
-          path="/organizer/*" 
-          element={
-            <ProtectedRoute requireRole="ORGANIZER" requireActiveRole>
-              <OrganizerPage />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* REFEREE Routes */}
-        <Route 
-          path="/referee/*" 
-          element={
-            <ProtectedRoute requireRole="REFEREE" requireActiveRole>
-              <RefereePage />
+            <ProtectedRoute requireActiveRole>
+              <MeetListPage />
             </ProtectedRoute>
           } 
         />
@@ -79,11 +57,8 @@ function App() {
           element={
             isAuthenticated ? (
               hasActiveRole ? (
-                // If already has active role, redirect to role page
-                activeRole?.role === 'DIRECTOR' ? <Navigate to="/director" replace /> :
-                activeRole?.role === 'ORGANIZER' ? <Navigate to="/organizer" replace /> :
-                activeRole?.role === 'REFEREE' ? <Navigate to="/referee" replace /> :
-                <Navigate to="/select-role" replace />
+                // All roles redirect to meets list
+                <Navigate to="/meets" replace />
               ) : (
                 <Navigate to="/select-role" replace />
               )

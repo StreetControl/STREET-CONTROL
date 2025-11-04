@@ -74,21 +74,27 @@ export interface UpdateWeightResponse {
 // MEETS API
 // ============================================
 
+export type MeetStatus = 'SETUP' | 'WEIGH_IN' | 'IN_PROGRESS' | 'COMPLETED';
+
 export interface Meet {
   id: number;
+  federation_id: number;
+  meet_code: string;
   name: string;
+  start_date: string; // DATE format from DB
+  level: string; // 'REGIONALE' | 'NAZIONALE'
+  regulation_code: string;
   meet_type_id: string;
-  date: string;
-  location?: string;
-  status: 'SETUP' | 'WEIGH_IN' | 'IN_PROGRESS' | 'COMPLETED';
-  created_at: string;
+  status: MeetStatus;
+  created_at?: string;
 }
 
 export interface CreateMeetRequest {
   name: string;
   meet_type_id: string;
-  date: string;
-  location?: string;
+  start_date: string; // DATE format YYYY-MM-DD
+  level: 'REGIONALE' | 'NAZIONALE';
+  regulation_code: string;
 }
 
 export interface CreateMeetResponse {

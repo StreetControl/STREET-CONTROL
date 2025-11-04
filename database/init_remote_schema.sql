@@ -71,10 +71,27 @@ CREATE TABLE age_categories_std (
 CREATE TABLE users (
   id          SERIAL PRIMARY KEY,
   auth_uid    UUID NOT NULL UNIQUE,     -- Supabase auth.users.id
-  name        TEXT NOT NULL,            -- display name / federation name
+  name        TEXT NOT NULL,            -- display name
   role        TEXT NOT NULL CHECK (role IN ('SUPER_ADMIN','ADMIN','ORGANIZER','REFEREE','DIRECTOR')),
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   FOREIGN KEY (auth_uid) REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE federations (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,         -- es: "STREET LIFTING ITALIA"
+  code        VARCHAR(10) NOT NULL UNIQUE,  -- es: "SLI"
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE user_federations (
+  id              SERIAL PRIMARY KEY,
+  user_id         INTEGER NOT NULL,
+  federation_id   INTEGER NOT NULL,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, federation_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (federation_id) REFERENCES federations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE judges (
@@ -106,13 +123,13 @@ CREATE TABLE athletes (
 CREATE TABLE meets (
   id               SERIAL PRIMARY KEY,
   federation_id    INTEGER,
-  meet_code        TEXT NOT NULL UNIQUE,  -- Identificatore univoco cross-database (es: "SLI-2025-ROMA-01")
+  meet_code        TEXT NOT NULL UNIQUE,  -- Identificatore univoco cross-database (es: "SLI-2025-01")
   name             TEXT NOT NULL,
   start_date       DATE NOT NULL,
   level            TEXT NOT NULL,         -- "REGIONALE" | "NAZIONALE"
   regulation_code  TEXT NOT NULL,         -- es: "WL_COEFF_2025"
   meet_type_id     VARCHAR(10) NOT NULL,  -- FK to meet_types(id)
-  FOREIGN KEY (federation_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (federation_id) REFERENCES federations(id) ON DELETE SET NULL,
   FOREIGN KEY (meet_type_id) REFERENCES meet_types(id)
 );
 
@@ -358,6 +375,14 @@ CREATE INDEX idx_meets_level ON meets(level);
 -- Indici per users (autenticazione)
 CREATE INDEX idx_users_auth_uid ON users(auth_uid);
 CREATE INDEX idx_users_role ON users(role);
+
+-- Indici per federations
+CREATE INDEX idx_federations_code ON federations(code);
+CREATE INDEX idx_federations_name ON federations(name);
+
+-- Indici per user_federations
+CREATE INDEX idx_user_federations_user ON user_federations(user_id);
+CREATE INDEX idx_user_federations_federation ON user_federations(federation_id);
 
 -- Indici per weight_categories_std
 CREATE INDEX idx_weight_cat_sex ON weight_categories_std(sex);

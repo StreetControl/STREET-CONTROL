@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 
 // Import routes
 import authRoutes from './routes/auth.js';
+import meetsRoutes from './routes/meets.js';
 
 // Load environment variables
 dotenv.config();
@@ -93,6 +94,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 // Auth routes
 app.use('/api/auth', authRoutes);
+
+// Meets routes
+app.use('/api/meets', meetsRoutes);
 
 // ============================================
 // ERROR HANDLING
