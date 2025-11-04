@@ -12,6 +12,7 @@ import SelectRolePage from './pages/auth/SelectRolePage';
 
 // Main Pages
 import MeetListPage from './pages/MeetListPage';
+import MeetSettingsPage from './pages/organizer/MeetSettingsPage';
 
 function App() {
   const { isAuthenticated, hasActiveRole } = useAuth();
@@ -43,10 +44,20 @@ function App() {
 
         {/* MEETS Routes - All roles access this */}
         <Route 
-          path="/meets/*" 
+          path="/meets" 
           element={
             <ProtectedRoute requireActiveRole>
               <MeetListPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* MEET SETTINGS Route - Only ORGANIZER can create/configure meets */}
+        <Route 
+          path="/meets/new" 
+          element={
+            <ProtectedRoute requireActiveRole>
+              <MeetSettingsPage />
             </ProtectedRoute>
           } 
         />

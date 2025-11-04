@@ -55,7 +55,7 @@ const MeetListPage = () => {
   };
 
   const handleCreateMeet = () => {
-    navigate('/meets/create');
+    navigate('/meets/new');
   };
 
   const handleLogout = async () => {

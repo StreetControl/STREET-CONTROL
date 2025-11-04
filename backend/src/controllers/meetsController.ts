@@ -47,7 +47,6 @@ export async function getMeets(req: AuthRequest, res: Response): Promise<Respons
       .eq('user_id', user.id);
 
     if (ufError) {
-      console.error('Error fetching user federations:', ufError);
       return res.status(500).json({ 
         success: false,
         error: 'Failed to fetch user federations' 
@@ -86,7 +85,6 @@ export async function getMeets(req: AuthRequest, res: Response): Promise<Respons
       .order('start_date', { ascending: false });
 
     if (meetsError) {
-      console.error('Error fetching meets:', meetsError);
       return res.status(500).json({ 
         success: false,
         error: 'Failed to fetch meets' 
@@ -121,7 +119,6 @@ export async function getMeets(req: AuthRequest, res: Response): Promise<Respons
     });
 
   } catch (error) {
-    console.error('Get meets error:', error);
     return res.status(500).json({ 
       success: false,
       error: 'Internal server error' 
@@ -254,7 +251,6 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
       .single();
 
     if (insertError) {
-      console.error('Error creating meet:', insertError);
       return res.status(500).json({ 
         success: false,
         error: 'Failed to create meet' 
@@ -286,15 +282,9 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     });
 
   } catch (error) {
-    console.error('Create meet error:', error);
     return res.status(500).json({ 
       success: false,
       error: 'Internal server error' 
     });
   }
 }
-
-export default {
-  getMeets,
-  createMeet
-};
