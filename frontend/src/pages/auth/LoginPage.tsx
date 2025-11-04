@@ -2,22 +2,23 @@
  * LOGIN PAGE
  */
 
-import { useState } from 'react';
+import { useState, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowRight } from 'lucide-react';
+import type { LoginFormData } from '../../types';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login, loading } = useAuth();
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: ''
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -25,7 +26,7 @@ const LoginPage = () => {
     setError(''); // Clear error on input change
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
 
@@ -35,7 +36,7 @@ const LoginPage = () => {
     if (result.success) {
       navigate('/select-role');
     } else {
-      setError(result.message);
+      setError(result.message || 'Errore durante il login');
     }
   };
 
@@ -61,8 +62,9 @@ const LoginPage = () => {
                          transition-all duration-500
                          filter group-hover:brightness-110"
               onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/src/assets/images/streetControlLogo.png';
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = '/src/assets/images/streetControlLogo.png';
               }}
             />
             {/* Animated border glow */}

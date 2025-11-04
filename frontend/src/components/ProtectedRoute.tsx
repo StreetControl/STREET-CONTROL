@@ -5,8 +5,13 @@
 
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import type { ProtectedRouteProps } from '../types';
 
-const ProtectedRoute = ({ children, requireRole = null, requireActiveRole = false }) => {
+const ProtectedRoute = ({ 
+  children, 
+  requireRole = null, 
+  requireActiveRole = false 
+}: ProtectedRouteProps) => {
   const { isAuthenticated, hasActiveRole, hasRole, isActiveRole, loading } = useAuth();
 
   // Show loading state while checking auth
@@ -48,7 +53,7 @@ const ProtectedRoute = ({ children, requireRole = null, requireActiveRole = fals
   }
 
   // All checks passed, render children
-  return children;
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

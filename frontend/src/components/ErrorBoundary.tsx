@@ -3,23 +3,24 @@
  * Catches React errors and prevents app crashes
  */
 
-import React from 'react';
+import React, { Component, ReactNode } from 'react';
+import type { ErrorBoundaryProps, ErrorBoundaryState } from '../types';
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     // Ignore browser extension errors
     if (error.message?.includes('message channel closed')) {
-      return { hasError: false };
+      return { hasError: false, error: null };
     }
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // Ignore errors from extensions
     if (error.message?.includes('message channel closed')) {
       return;
@@ -27,7 +28,7 @@ class ErrorBoundary extends React.Component {
     console.error('ErrorBoundary caught:', error, errorInfo);
   }
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-dark-bg">

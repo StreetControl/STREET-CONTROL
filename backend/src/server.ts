@@ -2,145 +2,144 @@
  * STREET CONTROL - BACKEND SERVER
  */
 
-import express from 'express'
-import cors from 'cors'
-import helmet from 'helmet'
-import morgan from 'morgan'
-import rateLimit from 'express-rate-limit'
-import dotenv from 'dotenv'
+import express, { Request, Response, NextFunction, Application } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
 
 // Import routes
-import authRoutes from './routes/auth.js'
+import authRoutes from './routes/auth.js';
 
 // Load environment variables
-dotenv.config()
+dotenv.config();
 
 // ============================================
 // EXPRESS CONFIGURATION
 // ============================================
 
-const app = express()
-const PORT = process.env.PORT || 5000
+const app: Application = express();
+const PORT = process.env.PORT || 5000;
 
 // ============================================
 // GLOBAL MIDDLEWARE
 // ============================================
 
 // 1. Security headers
-app.use(helmet())
+app.use(helmet());
 
 // 2. CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests without origin (e.g., Postman, mobile apps)
-    if (!origin) return callback(null, true)
+    if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
-      callback(null, true)
+      callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'))
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
-}))
+}));
 
 // 3. Body parsing
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // 4. HTTP logging
 if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'))
+  app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined'))
+  app.use(morgan('combined'));
 }
 
 // 5. Rate limiting (production only)
 if (process.env.NODE_ENV === 'production') {
   const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
     message: 'Too many requests from this IP, please try again later'
-  })
-  app.use('/api/', limiter)
+  });
+  app.use('/api/', limiter);
 }
 
 // ============================================
 // HEALTH CHECK
 // ============================================
 
-app.get('/', (req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     status: 'online',
     service: 'Street Control API',
     version: '1.0.0',
     timestamp: new Date().toISOString()
-  })
-})
+  });
+});
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
-  })
-})
+  });
+});
 
 // ============================================
 // API ROUTES
 // ============================================
 
 // Auth routes
-app.use('/api/auth', authRoutes)
-
+app.use('/api/auth', authRoutes);
 
 // ============================================
 // ERROR HANDLING
 // ============================================
 
 // 404 handler
-app.use((req, res) => {
+app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: 'Not Found',
     message: `The requested endpoint '${req.method} ${req.path}' does not exist`,
     path: req.path,
     method: req.method
-  })
-})
+  });
+});
 
 // Global error handler
-app.use((err, req, res, next) => {
-  console.error('Global error:', err)
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Global error:', err);
   
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  })
-})
+  });
+});
 
 // ============================================
 // START SERVER
 // ============================================
 
 app.listen(PORT, () => {
-  console.log('============================================')
-  console.log(`🏋️  Street Control Backend`)
-  console.log(`📡 Server running on port ${PORT}`)
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
-  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`)
-  console.log('============================================')
-})
+  console.log('============================================');
+  console.log(`🏋️  Street Control Backend`);
+  console.log(`📡 Server running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  console.log('============================================');
+});
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully...')
-  process.exit(0)
-})
+  console.log('SIGTERM received, shutting down gracefully...');
+  process.exit(0);
+});
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully...')
-  process.exit(0)
-})
+  console.log('SIGINT received, shutting down gracefully...');
+  process.exit(0);
+});
 
-export default app
+export default app;

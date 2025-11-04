@@ -1,6 +1,9 @@
 {
   "watch": ["src"],
-  "ext": "js,json",
-  "ignore": ["src/**/*.spec.js", "node_modules"],
-  "exec": "node src/server.js"
+  "ext": "ts,json",
+  "ignore": ["src/**/*.spec.ts", "node_modules", "dist"],
+  "exec": "node --import=tsx/esm src/server.ts",
+  "env": {
+    "NODE_NO_WARNINGS": "1"
+  }
 }

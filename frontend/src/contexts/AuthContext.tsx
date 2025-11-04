@@ -11,13 +11,23 @@
  * - POST /api/auth/verify-role → Validate and select role
  */
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import api, { setApiToken } from '../services/api';
+import type {
+  User,
+  ActiveRole,
+  AuthContextValue,
+  AuthResult,
+  UserRole,
+  UserInfoResponse,
+  VerifyRoleResponse,
+} from '../types';
 
-const AuthContext = createContext();
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextValue => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -25,12 +35,16 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [activeRole, setActiveRole] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [session, setSession] = useState(null);
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [activeRole, setActiveRole] = useState<ActiveRole | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   // RESTORE SESSION ON MOUNT + LISTEN TO AUTH CHANGES
   useEffect(() => {
@@ -96,7 +110,7 @@ export const AuthProvider = ({ children }) => {
    * LOGIN
    * Login with Supabase → Get JWT token
    */
-  const login = async (email, password) => {
+  const login = async (email: string, password: string): Promise<AuthResult> => {
     try {
       setError(null);
       setLoading(true);
@@ -121,14 +135,14 @@ export const AuthProvider = ({ children }) => {
       // Fetch user info (now API has the token)
       const userData = await fetchUserInfo();
       console.log('User logged in:', userData);
+      
       return {
         success: true,
-        user: userData,
-        requiresRoleSelection: userData.available_roles && userData.available_roles.length > 1
+        message: 'Login effettuato con successo'
       };
 
     } catch (err) {
-      const errorMessage = err.message || 'Errore durante il login';
+      const errorMessage = err instanceof Error ? err.message : 'Errore durante il login';
       setError(errorMessage);
 
       return {
@@ -144,38 +158,43 @@ export const AuthProvider = ({ children }) => {
    * SELECT ROLE
    * Choose role from available_roles
    * 
-   * @param {string} role - Role string ('DIRECTOR' | 'ORGANIZER' | 'REFEREE')
+   * @param role - Role string ('DIRECTOR' | 'ORGANIZER' | 'REFEREE')
    */
-  const selectRole = async (role) => {
+  const selectRole = async (role: UserRole): Promise<AuthResult> => {
     try {
       setError(null);
       setLoading(true);
 
       // Validate role with backend
-      const response = await api.post('/auth/verify-role', { role });
+      const response = await api.post<VerifyRoleResponse>('/auth/verify-role', { role });
 
       if (response.data.success === true) {
         // Backend validated the role
         const selectedRole = response.data.active_role;
 
-        // Update active role
-        setActiveRole(selectedRole);
+        if (selectedRole) {
+          // Update active role
+          setActiveRole(selectedRole);
 
-        const updatedUser = {
-          ...user,
-          active_role: selectedRole
-        };
-        setUser(updatedUser);
+          const updatedUser: User = {
+            ...user!,
+          };
+          setUser(updatedUser);
 
-        return {
-          success: true,
-          active_role: selectedRole
-        };
+          return {
+            success: true,
+            message: 'Ruolo selezionato con successo'
+          };
+        } else {
+          throw new Error('Active role not returned from server');
+        }
       } else {
-        throw new Error(response.data.error || 'Role selection failed');
+        throw new Error(response.data.message || 'Role selection failed');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'Error selecting role';
+      const errorMessage = 
+        (err as any).response?.data?.message || 
+        (err instanceof Error ? err.message : 'Error selecting role');
       setError(errorMessage);
       return {
         success: false,
@@ -190,7 +209,7 @@ export const AuthProvider = ({ children }) => {
    * LOGOUT
    * Note: Backend doesn't need logout call (stateless JWT)
    */
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
       setLoading(true);
 
@@ -210,7 +229,6 @@ export const AuthProvider = ({ children }) => {
       // 3. Clear token from API client
       setApiToken(null);
 
-      return { success: true };
     } catch (err) {
       console.error('Logout error:', err);
 
@@ -220,8 +238,6 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setSession(null);
       setApiToken(null);
-
-      return { success: true };
     } finally {
       setLoading(false);
     }
@@ -230,13 +246,13 @@ export const AuthProvider = ({ children }) => {
   /**
    * FETCH USER INFO
    * Get user data and available roles from backend after login
-   * @returns {Object} userData - User data from backend
+   * @returns userData - User data from backend
    */
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = async (): Promise<User> => {
     try {
-      const response = await api.get('/auth/user-info');
+      const response = await api.get<UserInfoResponse>('/auth/user-info');
 
-      if (response.data.success) {
+      if (response.data.user) {
         const userData = response.data.user;
         setUser(userData);
         
@@ -263,22 +279,22 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * HELPER: Check if user has specific role available
-   * @param {string} role - Role to check ('DIRECTOR' | 'ORGANIZER' | 'REFEREE')
+   * @param role - Role to check ('DIRECTOR' | 'ORGANIZER' | 'REFEREE')
    */
-  const hasRole = (role) => {
+  const hasRole = (role: UserRole): boolean => {
     if (!user) return false;
-    return user.available_roles?.some(r => r.role === role);
+    return user.available_roles?.some(r => r.role === role) || false;
   };
 
   /**
    * HELPER: Check if active role matches
-   * @param {string} role - Role to check
+   * @param role - Role to check
    */
-  const isActiveRole = (role) => {
-    return activeRole === role;
+  const isActiveRole = (role: UserRole): boolean => {
+    return activeRole?.role === role;
   };
 
-  const value = {
+  const value: AuthContextValue = {
     // State
     user,
     activeRole,

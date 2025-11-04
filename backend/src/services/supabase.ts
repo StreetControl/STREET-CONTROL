@@ -16,21 +16,21 @@
  * - Use RLS policies as additional security layer
  */
 
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
 // Load environment variables
-dotenv.config()
+dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
 // Validation
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error(
     'Missing Supabase environment variables!\n' +
     'Make sure SUPABASE_URL and SUPABASE_SERVICE_KEY are set in .env'
-  )
+  );
 }
 
 /**
@@ -39,7 +39,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
  * Uses SERVICE_ROLE_KEY - Bypasses RLS
  * Permissions must be managed manually in code
  */
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAdmin: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
@@ -48,9 +48,6 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   db: {
     schema: 'public'
   }
-})
+});
 
-// Export default
-export default supabaseAdmin
-
-console.log('Supabase backend client initialized')
+export default supabaseAdmin;

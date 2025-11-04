@@ -7,27 +7,28 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowRight } from 'lucide-react';
 import { roleConfig } from '../../utils/config';
-
+import type { UserRole, AvailableRole } from '../../types';
 
 const SelectRolePage = () => {
   const navigate = useNavigate();
-  const { user, selectRole, loading, logout} = useAuth();
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [error, setError] = useState('');
-
+  const { user, selectRole, loading, logout } = useAuth();
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const [error, setError] = useState<string>('');
 
   // Get role configuration
   const roles = roleConfig(user);
 
   // Sort available roles
   const sortedRoles = user?.available_roles?.sort((a, b) => {
-    return roles[a.role]?.order - roles[b.role]?.order;
+    const orderA = roles[a.role]?.order ?? 999;
+    const orderB = roles[b.role]?.order ?? 999;
+    return orderA - orderB;
   }) || [];
 
-  const handleRoleSelect = async (role) => {
+  const handleRoleSelect = async (role: AvailableRole) => {
     setError('');
     setSelectedRole(role.role);
-    console.log(`Selecting role: ${role.role}`)
+    console.log(`Selecting role: ${role.role}`);
     
     // Pass role string (not ID) to backend
     const result = await selectRole(role.role);
@@ -48,7 +49,7 @@ const SelectRolePage = () => {
           navigate('/');
       }
     } else {
-      setError(result.message);
+      setError(result.message || 'Errore nella selezione del ruolo');
       setSelectedRole(null);
     }
   };
@@ -74,7 +75,6 @@ const SelectRolePage = () => {
           <p className="text-dark-text-secondary text-lg">
             Seleziona il tuo ruolo per accedere alla piattaforma
           </p>
-
         </div>
 
         {/* Error Message */}
@@ -112,7 +112,7 @@ const SelectRolePage = () => {
 
             return (
               <button
-                key={role.id}
+                key={role.role}
                 onClick={() => handleRoleSelect(role)}
                 disabled={loading}
                 className={`
