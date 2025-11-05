@@ -12,6 +12,7 @@ import dotenv from 'dotenv';
 // Import routes
 import authRoutes from './routes/auth.js';
 import meetsRoutes from './routes/meets.js';
+import athletesRoutes from './routes/athletes.js';
 
 // Load environment variables
 dotenv.config();
@@ -97,6 +98,9 @@ app.use('/api/auth', authRoutes);
 
 // Meets routes
 app.use('/api/meets', meetsRoutes);
+
+// Athletes routes (nested under meets)
+app.use('/api', athletesRoutes);
 
 // ============================================
 // ERROR HANDLING

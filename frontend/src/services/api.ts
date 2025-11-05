@@ -32,6 +32,8 @@ import type {
   UpdateAthleteWeightRequest,
   UpdateAthleteWeightResponse,
   GetAthletesResponse,
+  BulkCreateAthletesRequest,
+  BulkCreateAthletesResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api';
@@ -169,7 +171,64 @@ export async function getMeets(): Promise<GetMeetsResponse> {
 // ============================================
 
 /**
- * Add athlete
+ * Get athletes for a specific meet
+ */
+export async function getMeetAthletes(meetId: number): Promise<GetAthletesResponse> {
+  const response = await api.get<GetAthletesResponse>(`/meets/${meetId}/athletes`);
+  return response.data;
+}
+
+/**
+ * Add single athlete to meet
+ */
+export async function addAthleteToMeet(meetId: number, athleteData: {
+  cf: string;
+  firstName: string;
+  lastName: string;
+  sex: 'M' | 'F';
+  birthDate: string;
+}): Promise<AddAthleteResponse> {
+  const response = await api.post<AddAthleteResponse>(`/meets/${meetId}/athletes`, athleteData);
+  return response.data;
+}
+
+/**
+ * Bulk import athletes from CSV
+ */
+export async function bulkImportAthletes(
+  meetId: number, 
+  data: BulkCreateAthletesRequest
+): Promise<BulkCreateAthletesResponse> {
+  const response = await api.post<BulkCreateAthletesResponse>(
+    `/meets/${meetId}/athletes/bulk`, 
+    data
+  );
+  return response.data;
+}
+
+/**
+ * Update athlete information
+ */
+export async function updateAthlete(athleteId: number, athleteData: {
+  firstName?: string;
+  lastName?: string;
+  sex?: 'M' | 'F';
+  birthDate?: string;
+}): Promise<{ success: boolean; message?: string }> {
+  const response = await api.patch(`/athletes/${athleteId}`, athleteData);
+  return response.data;
+}
+
+/**
+ * Delete athlete from meet
+ */
+export async function deleteAthleteFromMeet(meetId: number, athleteId: number): Promise<{ success: boolean; message?: string }> {
+  const response = await api.delete(`/meets/${meetId}/athletes/${athleteId}`);
+  return response.data;
+}
+
+/**
+ * Add athlete (legacy - kept for backwards compatibility)
  */
 export async function addAthlete(athleteData: AddAthleteRequest): Promise<AddAthleteResponse> {
   const response = await api.post<AddAthleteResponse>('/athletes', athleteData);

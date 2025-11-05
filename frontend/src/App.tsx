@@ -62,6 +62,16 @@ function App() {
           } 
         />
 
+        {/* MEET SETTINGS Route with ID - Edit existing meet */}
+        <Route 
+          path="/meets/:meetId/settings" 
+          element={
+            <ProtectedRoute requireActiveRole>
+              <MeetSettingsPage />
+            </ProtectedRoute>
+          } 
+        />
+
         {/* Default Route */}
         <Route 
           path="/" 

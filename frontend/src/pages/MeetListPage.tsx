@@ -51,7 +51,8 @@ const MeetListPage = () => {
   };
 
   const handleMeetClick = (meetId: number) => {
-    navigate(`/meets/${meetId}`);
+    // Navigate to settings page, INSCRIPTION tab will be default for existing meets
+    navigate(`/meets/${meetId}/settings`);
   };
 
   const handleCreateMeet = () => {

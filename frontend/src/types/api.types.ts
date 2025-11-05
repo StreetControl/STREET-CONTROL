@@ -164,6 +164,33 @@ export interface GetAthletesResponse {
   message?: string;
 }
 
+export interface BulkCreateAthletesRequest {
+  athletes: {
+    cf: string;
+    firstName: string;
+    lastName: string;
+    sex: Sex;
+    birthDate: string;
+    weightCategory?: string;
+    team?: string;
+    maxSq?: number;
+    maxPu?: number;
+    maxDip?: number;
+    maxMp?: number;
+    maxMu?: number;
+  }[];
+}
+
+export interface BulkCreateAthletesResponse {
+  success: boolean;
+  message?: string;
+  results?: {
+    success: number;
+    failed: number;
+    errors: string[];
+  };
+}
+
 // ============================================
 // LIFTS & ATTEMPTS
 // ============================================

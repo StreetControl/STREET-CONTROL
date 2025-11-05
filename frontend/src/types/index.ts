@@ -43,6 +43,8 @@ export type {
   UpdateAthleteWeightRequest,
   UpdateAthleteWeightResponse,
   GetAthletesResponse,
+  BulkCreateAthletesRequest,
+  BulkCreateAthletesResponse,
   Lift,
   Attempt,
 } from './api.types';

@@ -34,6 +34,12 @@
     @apply w-full bg-dark-bg-secondary border border-dark-border text-dark-text px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 placeholder-dark-text-muted;
   }
 
+  /* Input Field Disabled/Read-only */
+  .input-field:disabled,
+  .input-field:read-only {
+    @apply bg-dark-bg cursor-not-allowed opacity-70;
+  }
+
   /* Card Container */
   .card {
     @apply bg-dark-bg-secondary border border-dark-border rounded-lg shadow-dark;
