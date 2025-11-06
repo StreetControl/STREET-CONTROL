@@ -77,6 +77,7 @@ export interface Meet {
   date: Date;
   location: string | null;
   status: MeetStatus;
+  score_type: string; // 'IPF' | 'RIS'
   created_at: Date;
 }
 

@@ -129,6 +129,7 @@ CREATE TABLE meets (
   level            TEXT NOT NULL,         -- "REGIONALE" | "NAZIONALE"
   regulation_code  TEXT NOT NULL,         -- es: "WL_COEFF_2025"
   meet_type_id     VARCHAR(10) NOT NULL,  -- FK to meet_types(id)
+  score_type       TEXT NOT NULL DEFAULT 'RIS',  -- Tipo punteggio
   FOREIGN KEY (federation_id) REFERENCES federations(id) ON DELETE SET NULL,
   FOREIGN KEY (meet_type_id) REFERENCES meet_types(id)
 );

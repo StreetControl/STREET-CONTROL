@@ -76,6 +76,7 @@ export async function getMeets(req: AuthRequest, res: Response): Promise<Respons
         level,
         regulation_code,
         meet_type_id,
+        score_type,
         meet_types (
           id,
           name
@@ -177,13 +178,13 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     const federation_id = userFederations.federation_id;
 
     // Extract request body
-    const { name, meet_type_id, start_date, level, regulation_code } = req.body;
+    const { name, meet_type_id, start_date, level, regulation_code, score_type } = req.body;
 
     // Validation
-    if (!name || !meet_type_id || !start_date || !level || !regulation_code) {
+    if (!name || !meet_type_id || !start_date || !level || !regulation_code || !score_type) {
       return res.status(400).json({ 
         success: false,
-        error: 'Missing required fields: name, meet_type_id, start_date, level, regulation_code' 
+        error: 'Missing required fields: name, meet_type_id, start_date, level, regulation_code, score_type' 
       });
     }
 
@@ -211,10 +212,18 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     }
 
     // Validate level
-    if (!['REGIONALE', 'NAZIONALE'].includes(level)) {
+    if (!['REGIONALE', 'NAZIONALE', 'INTERNAZIONALE'].includes(level)) {
       return res.status(400).json({ 
         success: false,
         error: 'Invalid level. Must be REGIONALE or NAZIONALE' 
+      });
+    }
+
+    // Validate score_type
+    if (!['IPF', 'RIS'].includes(score_type)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid score_type. Must be IPF or RIS' 
       });
     }
 
@@ -236,7 +245,8 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
         start_date,
         level,
         regulation_code,
-        meet_type_id
+        meet_type_id,
+        score_type
       })
       .select(`
         id,
@@ -246,7 +256,8 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
         start_date,
         level,
         regulation_code,
-        meet_type_id
+        meet_type_id,
+        score_type
       `)
       .single();
 
