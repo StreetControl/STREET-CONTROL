@@ -51,6 +51,7 @@ export interface AuthContextMethods {
   login: (email: string, password: string) => Promise<AuthResult>;
   selectRole: (role: UserRole) => Promise<AuthResult>;
   logout: () => Promise<void>;
+  clearActiveRole: () => void;
   hasRole: (role: UserRole) => boolean;
   isActiveRole: (role: UserRole) => boolean;
 }

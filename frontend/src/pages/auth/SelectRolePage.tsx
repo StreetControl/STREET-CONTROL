@@ -2,7 +2,7 @@
  * SELECT ROLE PAGE
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowRight } from 'lucide-react';
@@ -11,9 +11,17 @@ import type { UserRole, AvailableRole } from '../../types';
 
 const SelectRolePage = () => {
   const navigate = useNavigate();
-  const { user, selectRole, loading, logout } = useAuth();
+  const { user, activeRole, hasActiveRole, selectRole, loading, logout } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [error, setError] = useState<string>('');
+
+  // Redirect if user already has an active role
+  useEffect(() => {
+    if (!loading && hasActiveRole && activeRole) {
+      console.log('User already has active role, redirecting to /meets');
+      navigate('/meets', { replace: true });
+    }
+  }, [hasActiveRole, activeRole, loading, navigate]);
 
   // Get role configuration
   const roles = roleConfig(user);

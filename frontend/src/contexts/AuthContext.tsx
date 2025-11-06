@@ -27,6 +27,12 @@ import type {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// LOCAL STORAGE KEYS
+const STORAGE_KEYS = {
+  USER: 'street_control_user',
+  ACTIVE_ROLE: 'street_control_active_role',
+};
+
 export const useAuth = (): AuthContextValue => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -40,8 +46,25 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [activeRole, setActiveRole] = useState<ActiveRole | null>(null);
+  // Initialize state from localStorage immediately (synchronous)
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+  
+  const [activeRole, setActiveRole] = useState<ActiveRole | null>(() => {
+    try {
+      const storedActiveRole = localStorage.getItem(STORAGE_KEYS.ACTIVE_ROLE);
+      return storedActiveRole ? JSON.parse(storedActiveRole) : null;
+    } catch {
+      return null;
+    }
+  });
+  
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -58,6 +81,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         if (error || !currentSession) {
           console.log('No active session to restore');
+          // Clear localStorage and state if no session
+          localStorage.removeItem(STORAGE_KEYS.USER);
+          localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
+          setUser(null);
+          setActiveRole(null);
           return;
         }
         
@@ -66,13 +94,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const token = currentSession.access_token;
         setApiToken(token);
         
-        // Fetch user data from backend
-        try {
-          await fetchUserInfo();
-        } catch (err) {
-          console.error('Failed to fetch user info during restore:', err);
-          // Clear invalid session
-          await supabase.auth.signOut();
+        // If we don't have user data in state (not restored from localStorage), fetch it
+        const hasStoredUser = localStorage.getItem(STORAGE_KEYS.USER);
+        if (!hasStoredUser) {
+          try {
+            await fetchUserInfo();
+          } catch (err) {
+            console.error('Failed to fetch user info during restore:', err);
+            // Clear invalid session
+            await supabase.auth.signOut();
+            localStorage.removeItem(STORAGE_KEYS.USER);
+            localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
+          }
+        } else {
+          console.log('User and role restored from localStorage');
         }
         
       } catch (err) {
@@ -136,6 +171,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const userData = await fetchUserInfo();
       console.log('User logged in:', userData);
       
+      // Save user to localStorage
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      
       return {
         success: true,
         message: 'Login effettuato con successo'
@@ -181,6 +219,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           };
           setUser(updatedUser);
 
+          // Save active role to localStorage
+          localStorage.setItem(STORAGE_KEYS.ACTIVE_ROLE, JSON.stringify(selectedRole));
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
           return {
             success: true,
             message: 'Ruolo selezionato con successo'
@@ -203,6 +245,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * CLEAR ACTIVE ROLE
+   * Allows user to change role without logging out
+   */
+  const clearActiveRole = (): void => {
+    setActiveRole(null);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
+    console.log('Active role cleared');
   };
 
   /**
@@ -229,6 +281,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // 3. Clear token from API client
       setApiToken(null);
 
+      // 4. Clear localStorage
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
+
     } catch (err) {
       console.error('Logout error:', err);
 
@@ -238,6 +294,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setError(null);
       setSession(null);
       setApiToken(null);
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
     } finally {
       setLoading(false);
     }
@@ -255,6 +313,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (response.data.user) {
         const userData = response.data.user;
         setUser(userData);
+        
+        // Save user to localStorage
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
         
         // Return userData so caller can use it immediately (state update is async)
         return userData;
@@ -308,6 +369,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     login,
     selectRole,
     logout,
+    clearActiveRole,
 
     // Helpers
     hasRole,

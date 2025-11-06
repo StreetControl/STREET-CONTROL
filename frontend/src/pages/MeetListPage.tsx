@@ -14,7 +14,7 @@ import type { Meet } from '../types';
 
 const MeetListPage = () => {
   const navigate = useNavigate();
-  const { user, activeRole, logout } = useAuth();
+  const { user, activeRole, logout, clearActiveRole } = useAuth();
   
   const [meets, setMeets] = useState<Meet[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -65,6 +65,8 @@ const MeetListPage = () => {
   };
 
   const handleBackToRoles = () => {
+    // Clear active role before navigating to select-role page
+    clearActiveRole();
     navigate('/select-role');
   };
 
