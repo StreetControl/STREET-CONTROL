@@ -194,10 +194,8 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     e.dataTransfer.setData('athleteId', athleteId.toString());
   };
 
-  const handleDrop = (e: React.DragEvent, targetFlightId: number, targetGroupId: number) => {
+  const handleDrop = (e: React.DragEvent, _targetFlightId: number, _targetGroupId: number) => {
     e.preventDefault();
-    const athleteId = parseInt(e.dataTransfer.getData('athleteId'));
-    
     // TODO: Implement drag & drop logic in STEP 3
   };
 
@@ -347,7 +345,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                     <td className="py-3 px-4 text-dark-text">
                       <select
                         value={athlete.flight_id}
-                        onChange={(e) => {
+                        onChange={() => {
                           // TODO: Handle flight change
                         }}
                         className="bg-dark-bg-secondary border border-dark-border rounded px-2 py-1 text-sm text-dark-text"
@@ -360,7 +358,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                     <td className="py-3 px-4 text-dark-text">
                       <select
                         value={athlete.group_id}
-                        onChange={(e) => {
+                        onChange={() => {
                           // TODO: Handle group change
                         }}
                         className="bg-dark-bg-secondary border border-dark-border rounded px-2 py-1 text-sm text-dark-text"
