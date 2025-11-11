@@ -5,10 +5,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMeetAthletes, bulkImportAthletes } from '../../services/api';
+import { getMeetAthletes, bulkImportAthletes, deleteAthleteFromMeet } from '../../services/api';
 import { supabase } from '../../services/supabase';
 
 interface AthleteRow {
+  id: number;
   cf: string;
   first_name: string;
   last_name: string;
@@ -45,6 +46,7 @@ export default function RegistrationTab({ meetId }: RegistrationTabProps) {
       const response = await getMeetAthletes(parseInt(meetId));
       if (response.success && response.athletes) {
         const athletesData = response.athletes.map((item: any) => ({
+          id: item.athletes.id,
           cf: item.athletes.cf,
           first_name: item.athletes.first_name,
           last_name: item.athletes.last_name,
@@ -241,14 +243,32 @@ ${exampleRow2Values.join(',')}`;
     if (!meetId) return;
     if (!confirm('Sei sicuro di voler eliminare questo atleta dalla gara?')) return;
 
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
     try {
       const athlete = athletes.find(a => a.cf === cf);
-      if (!athlete) return;
+      if (!athlete) {
+        setError('Atleta non trovato');
+        return;
+      }
 
-      setAthletes(prev => prev.filter(a => a.cf !== cf));
-      setSuccessMessage('Atleta rimosso');
+      // Chiama API per eliminare da form_info e form_lifts (ma NON da athletes)
+      const response = await deleteAthleteFromMeet(parseInt(meetId), athlete.id);
+      
+      if (response.success) {
+        // Rimuovi dallo state locale
+        setAthletes(prev => prev.filter(a => a.cf !== cf));
+        setSuccessMessage('Atleta rimosso dalla gara con successo');
+      } else {
+        setError('Errore durante l\'eliminazione');
+      }
     } catch (err: any) {
-      setError('Errore durante l\'eliminazione');
+      console.error('Error deleting athlete:', err);
+      setError(err.message || 'Errore durante l\'eliminazione');
+    } finally {
+      setIsLoading(false);
     }
   };
 

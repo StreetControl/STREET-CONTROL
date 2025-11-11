@@ -221,8 +221,96 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       errors: [] as string[]
     };
 
-    // Get default categories
-    const { data: weightCatM } = await supabaseAdmin
+    // ============================================
+    // Recupera la data di inizio della gara
+    // ============================================
+    const { data: meetData, error: meetError } = await supabaseAdmin
+      .from('meets')
+      .select('start_date')
+      .eq('id', meetId)
+      .single();
+
+    if (meetError || !meetData) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch meet information'
+      });
+    }
+
+    const meetYear = new Date(meetData.start_date).getFullYear();
+
+    // ============================================
+    // HELPER: Calcola età SOLARE da data di nascita
+    // ============================================
+    // L'età è calcolata come anno solare della gara - anno di nascita
+    // Esempio: nato 15/09/2001, gara 10/12/2026 → età = 2026 - 2001 = 25 (Senior)
+    const calculateAge = (birthDate: string): number => {
+      const birth = new Date(birthDate);
+      
+      // Età solare: differenza tra anno della gara e anno di nascita (ignora mese/giorno)
+      const age = meetYear - birth.getFullYear();
+      
+      return age;
+    };
+
+    // ============================================
+    // HELPER: Trova categoria età da età calcolata
+    // ============================================
+    const findAgeCategoryId = async (age: number): Promise<number | null> => {
+      const { data: ageCategories } = await supabaseAdmin
+        .from('age_categories_std')
+        .select('id, min_age, max_age')
+        .order('ord');
+
+      if (!ageCategories || ageCategories.length === 0) {
+        return null;
+      }
+
+      // Trova categoria che contiene l'età
+      for (const cat of ageCategories) {
+        const minAge = cat.min_age;
+        const maxAge = cat.max_age;
+
+        // Gestisci casi speciali
+        if (minAge === null && maxAge !== null) {
+          // Es: Sub-Junior (NULL - 18)
+          if (age <= maxAge) return cat.id;
+        } else if (minAge !== null && maxAge === null) {
+          // Es: Master IV (70 - NULL)
+          if (age >= minAge) return cat.id;
+        } else if (minAge !== null && maxAge !== null) {
+          // Range normale (es: 24-39)
+          if (age >= minAge && age <= maxAge) return cat.id;
+        }
+      }
+
+      // Se non trova nulla, ritorna la prima categoria
+      return ageCategories[0].id;
+    };
+
+    // ============================================
+    // HELPER: Trova categoria peso da nome (es: "-80M", "+70F")
+    // ============================================
+    const findWeightCategoryId = async (weightCatName: string, sex: 'M' | 'F'): Promise<number | null> => {
+      if (!weightCatName || !weightCatName.trim()) {
+        return null;
+      }
+
+      // Cerca per nome esatto
+      const { data: weightCat } = await supabaseAdmin
+        .from('weight_categories_std')
+        .select('id')
+        .eq('name', weightCatName.trim())
+        .eq('sex', sex)
+        .single();
+
+      return weightCat?.id || null;
+    };
+
+    // ============================================
+    // CARICA CATEGORIA PESO DEFAULT (fallback)
+    // ============================================
+    const { data: defaultWeightCatM } = await supabaseAdmin
       .from('weight_categories_std')
       .select('id')
       .eq('sex', 'M')
@@ -230,7 +318,7 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       .limit(1)
       .single();
 
-    const { data: weightCatF } = await supabaseAdmin
+    const { data: defaultWeightCatF } = await supabaseAdmin
       .from('weight_categories_std')
       .select('id')
       .eq('sex', 'F')
@@ -238,21 +326,16 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       .limit(1)
       .single();
 
-    const { data: ageCat } = await supabaseAdmin
-      .from('age_categories_std')
-      .select('id')
-      .order('ord')
-      .limit(1)
-      .single();
-
-    if (!weightCatM || !weightCatF || !ageCat) {
+    if (!defaultWeightCatM || !defaultWeightCatF) {
       return res.status(500).json({
         success: false,
-        error: 'Default categories not found in database'
+        error: 'Default weight categories not found in database'
       });
     }
 
+    // ============================================
     // Process each athlete
+    // ============================================
     for (const athlete of athletes) {
       try {
         const { cf, firstName, lastName, sex, birthDate, team } = athlete;
@@ -354,17 +437,50 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
           continue;
         }
 
-        // Register for meet
-        const weightCatId = sex === 'M' ? weightCatM.id : weightCatF.id;
+        // ============================================
+        // CALCOLA CATEGORIA PESO
+        // ============================================
+        let weightCatId: number;
 
+        // Se presente weight_category nel CSV, cercala
+        if (athlete.weightCategory) {
+          const foundWeightCatId = await findWeightCategoryId(athlete.weightCategory, sex);
+          
+          if (foundWeightCatId) {
+            weightCatId = foundWeightCatId;
+          } else {
+            // Categoria non trovata, usa default e logga warning
+            weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
+            console.warn(`Athlete ${cf}: Weight category "${athlete.weightCategory}" not found, using default`);
+          }
+        } else {
+          // Nessuna categoria specificata, usa default
+          weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
+        }
+
+        // ============================================
+        // CALCOLA CATEGORIA ETÀ
+        // ============================================
+        const age = calculateAge(birthDate);
+        const ageCatId = await findAgeCategoryId(age);
+
+        if (!ageCatId) {
+          results.failed++;
+          results.errors.push(`Athlete ${cf}: Could not determine age category (age: ${age})`);
+          continue;
+        }
+
+        // ============================================
+        // REGISTRA ATLETA PER LA GARA
+        // ============================================
         const { data: formInfo, error: formError } = await supabaseAdmin
           .from('form_info')
           .insert({
             meet_id: parseInt(meetId),
             athlete_id: athleteId,
-            team_id: teamId, // ← AGGIUNGI TEAM_ID
-            weight_cat_id: weightCatId,
-            age_cat_id: ageCat.id
+            team_id: teamId,
+            weight_cat_id: weightCatId,   // ← CALCOLATO DA CSV O DEFAULT
+            age_cat_id: ageCatId           // ← CALCOLATO DA BIRTH_DATE
           })
           .select('id')
           .single();
