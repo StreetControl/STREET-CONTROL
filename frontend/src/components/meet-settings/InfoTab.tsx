@@ -27,6 +27,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
     competition_type: '',
     level: '',
     start_date: '',
+    end_date: '',
     regulation_code: '',
     score_type: '' // Default value
   });
@@ -83,7 +84,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
 
       const { data, error } = await supabase
         .from('meets')
-        .select('id, name, meet_type_id, level, start_date, regulation_code, score_type')
+        .select('id, name, meet_type_id, level, start_date, end_date, regulation_code, score_type')
         .eq('id', meetIdNum)
         .maybeSingle();
 
@@ -99,6 +100,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
           competition_type: data.meet_type_id,
           level: data.level,
           start_date: data.start_date,
+          end_date: data.end_date,
           regulation_code: data.regulation_code,
           score_type: data.score_type || 'RIS'
         });
@@ -132,8 +134,16 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
 
     try {
       if (!formData.competition_name || !formData.competition_type || 
-          !formData.level || !formData.start_date || !formData.regulation_code || !formData.score_type) {
+          !formData.level || !formData.start_date || !formData.end_date || 
+          !formData.regulation_code || !formData.score_type) {
         throw new Error('Tutti i campi sono obbligatori');
+      }
+
+      // Validate end_date >= start_date
+      const startDate = new Date(formData.start_date);
+      const endDate = new Date(formData.end_date);
+      if (endDate < startDate) {
+        throw new Error('La data di fine deve essere successiva o uguale alla data di inizio');
       }
 
       if (existingMeetId && isEditMode) {
@@ -141,6 +151,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
         const updateRequest = {
           name: formData.competition_name,
           start_date: formData.start_date,
+          end_date: formData.end_date,
           level: formData.level as 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE',
           regulation_code: formData.regulation_code,
           score_type: formData.score_type
@@ -163,6 +174,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
           name: formData.competition_name,
           meet_type_id: formData.competition_type,
           start_date: formData.start_date,
+          end_date: formData.end_date,
           level: formData.level as 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE',
           regulation_code: formData.regulation_code,
           score_type: formData.score_type
@@ -351,6 +363,38 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
               className="input-field"
               required
             />
+          )}
+        </div>
+
+        {/* End Date */}
+        <div>
+          <label className="label">
+            Data Fine
+          </label>
+          {isReadOnly ? (
+            <div className="w-full bg-dark-bg border border-dark-border text-dark-text px-4 py-3 rounded-lg">
+              {formData.end_date ? new Date(formData.end_date).toLocaleDateString('it-IT', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              }) : '-'}
+            </div>
+          ) : (
+            <input
+              type="date"
+              id="end_date"
+              name="end_date"
+              value={formData.end_date}
+              onChange={handleChange}
+              className="input-field"
+              required
+              min={formData.start_date || undefined}
+            />
+          )}
+          {!isReadOnly && formData.start_date && formData.end_date && (
+            <p className="text-xs text-dark-text-secondary mt-1">
+              Durata gara: {Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} giorni
+            </p>
           )}
         </div>
 

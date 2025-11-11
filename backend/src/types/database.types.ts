@@ -72,13 +72,17 @@ export interface Athlete {
 // Meet
 export interface Meet {
   id: number;
+  federation_id: number | null;
+  meet_code: string;
   name: string;
+  start_date: string; // DATE format 'YYYY-MM-DD'
+  end_date: string; // DATE format 'YYYY-MM-DD'
+  level: 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE';
+  regulation_code: string;
   meet_type_id: string;
-  date: Date;
-  location: string | null;
-  status: MeetStatus;
   score_type: string; // 'IPF' | 'RIS'
-  created_at: Date;
+  status?: MeetStatus; // Computed field (not in DB)
+  created_at?: Date;
 }
 
 // Meet Athlete (registration)

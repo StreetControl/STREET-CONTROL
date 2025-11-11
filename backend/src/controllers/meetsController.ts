@@ -178,13 +178,13 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     const federation_id = userFederations.federation_id;
 
     // Extract request body
-    const { name, meet_type_id, start_date, level, regulation_code, score_type } = req.body;
+    const { name, meet_type_id, start_date, end_date, level, regulation_code, score_type } = req.body;
 
     // Validation
-    if (!name || !meet_type_id || !start_date || !level || !regulation_code || !score_type) {
+    if (!name || !meet_type_id || !start_date || !end_date || !level || !regulation_code || !score_type) {
       return res.status(400).json({ 
         success: false,
-        error: 'Missing required fields: name, meet_type_id, start_date, level, regulation_code, score_type' 
+        error: 'Missing required fields: name, meet_type_id, start_date, end_date, level, regulation_code, score_type' 
       });
     }
 
@@ -207,7 +207,23 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     if (!dateRegex.test(start_date)) {
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid date format. Use YYYY-MM-DD' 
+        error: 'Invalid start_date format. Use YYYY-MM-DD' 
+      });
+    }
+    if (!dateRegex.test(end_date)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid end_date format. Use YYYY-MM-DD' 
+      });
+    }
+
+    // Validate end_date >= start_date
+    const startDateObj = new Date(start_date);
+    const endDateObj = new Date(end_date);
+    if (endDateObj < startDateObj) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'end_date must be greater than or equal to start_date' 
       });
     }
 
@@ -215,7 +231,7 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     if (!['REGIONALE', 'NAZIONALE', 'INTERNAZIONALE'].includes(level)) {
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid level. Must be REGIONALE or NAZIONALE' 
+        error: 'Invalid level. Must be REGIONALE, NAZIONALE or INTERNAZIONALE' 
       });
     }
 
@@ -243,6 +259,7 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
         meet_code,
         name,
         start_date,
+        end_date,
         level,
         regulation_code,
         meet_type_id,
@@ -320,10 +337,10 @@ export async function updateMeet(req: AuthRequest, res: Response): Promise<Respo
     }
 
     const { meetId } = req.params;
-    const { name, start_date, level, regulation_code, score_type } = req.body;
+    const { name, start_date, end_date, level, regulation_code, score_type } = req.body;
 
     // Validate required fields
-    if (!name || !start_date || !level || !regulation_code || !score_type) {
+    if (!name || !start_date || !end_date || !level || !regulation_code || !score_type) {
       return res.status(400).json({ 
         success: false,
         error: 'All fields are required' 
@@ -335,7 +352,23 @@ export async function updateMeet(req: AuthRequest, res: Response): Promise<Respo
     if (!dateRegex.test(start_date)) {
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid date format. Use YYYY-MM-DD' 
+        error: 'Invalid start_date format. Use YYYY-MM-DD' 
+      });
+    }
+    if (!dateRegex.test(end_date)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid end_date format. Use YYYY-MM-DD' 
+      });
+    }
+
+    // Validate end_date >= start_date
+    const startDateObj = new Date(start_date);
+    const endDateObj = new Date(end_date);
+    if (endDateObj < startDateObj) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'end_date must be greater than or equal to start_date' 
       });
     }
 
@@ -410,6 +443,7 @@ export async function updateMeet(req: AuthRequest, res: Response): Promise<Respo
       .update({
         name,
         start_date,
+        end_date,
         level,
         regulation_code,
         score_type

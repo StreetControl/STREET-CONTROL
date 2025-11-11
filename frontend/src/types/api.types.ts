@@ -81,7 +81,8 @@ export interface Meet {
   federation_id: number;
   meet_code: string;
   name: string;
-  start_date: string; // DATE format from DB
+  start_date: string; // DATE format YYYY-MM-DD
+  end_date: string; // DATE format YYYY-MM-DD
   level: 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE';
   regulation_code: string;
   meet_type_id: string;
@@ -94,6 +95,7 @@ export interface CreateMeetRequest {
   name: string;
   meet_type_id: string;
   start_date: string; // DATE format YYYY-MM-DD
+  end_date: string; // DATE format YYYY-MM-DD
   level: 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE';
   regulation_code: string;
   score_type: string; // 'IPF' | 'RIS'

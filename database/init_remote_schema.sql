@@ -125,11 +125,13 @@ CREATE TABLE meets (
   federation_id    INTEGER,
   meet_code        TEXT NOT NULL UNIQUE,  -- Identificatore univoco cross-database (es: "SLI-2025-01")
   name             TEXT NOT NULL,
-  start_date       DATE NOT NULL,
-  level            TEXT NOT NULL,         -- "REGIONALE" | "NAZIONALE"
+  start_date       DATE NOT NULL,         -- Data inizio gara
+  end_date         DATE NOT NULL,         -- Data fine gara (inclusiva). Durata = end_date - start_date + 1 giorni
+  level            TEXT NOT NULL,         -- "REGIONALE" | "NAZIONALE" | "INTERNAZIONALE"
   regulation_code  TEXT NOT NULL,         -- es: "WL_COEFF_2025"
   meet_type_id     VARCHAR(10) NOT NULL,  -- FK to meet_types(id)
-  score_type       TEXT NOT NULL DEFAULT 'RIS',  -- Tipo punteggio
+  score_type       TEXT NOT NULL DEFAULT 'RIS',  -- Tipo punteggio: 'IPF' | 'RIS'
+  CONSTRAINT check_end_date_after_start CHECK (end_date >= start_date),
   FOREIGN KEY (federation_id) REFERENCES federations(id) ON DELETE SET NULL,
   FOREIGN KEY (meet_type_id) REFERENCES meet_types(id)
 );
@@ -175,7 +177,8 @@ CREATE TABLE flights (
   meet_id     INTEGER NOT NULL,
   name        TEXT NOT NULL,             -- es: "Flight A (Mattina)"
   ord         INTEGER NOT NULL,
-  start_time  TEXT,                      -- opzionale
+  day_number  INTEGER NOT NULL DEFAULT 1 CHECK (day_number >= 1),  -- Giorno gara (1=primo giorno, 2=secondo, etc.)
+  start_time  TEXT,                      -- Orario inizio flight (formato HH:MM, es: "09:00", "14:30")
   UNIQUE (meet_id, ord),
   FOREIGN KEY (meet_id) REFERENCES meets(id) ON DELETE CASCADE
 );
