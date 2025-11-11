@@ -1,10 +1,55 @@
--- PostgreSQL Remote Database Schema
+-- ============================================
+-- STREET CONTROL - COMPLETE DATABASE SCHEMA
+-- PostgreSQL/Supabase Compatible
+-- Version: 2.0 (Fixed SERIAL PRIMARY KEY)
+-- ============================================
+
+/* ---------------------------
+  STEP 1: DROP OLD TABLES (se esistono)
+  IMPORTANTE: Eseguire SOLO se vuoi ricreare tutto da zero!
+  Commenta questa sezione se vuoi mantenere i dati esistenti.
+---------------------------- */
+
+-- DROP CASCADE elimina anche le foreign key
+DROP TABLE IF EXISTS result_lifts CASCADE;
+DROP TABLE IF EXISTS results CASCADE;
+DROP TABLE IF EXISTS records CASCADE;
+DROP TABLE IF EXISTS current_state CASCADE;
+DROP TABLE IF EXISTS attempts CASCADE;
+DROP TABLE IF EXISTS weight_in_info CASCADE;
+DROP TABLE IF EXISTS nomination CASCADE;
+DROP TABLE IF EXISTS groups CASCADE;
+DROP TABLE IF EXISTS flights CASCADE;
+DROP TABLE IF EXISTS form_lifts CASCADE;
+DROP TABLE IF EXISTS form_info CASCADE;
+DROP TABLE IF EXISTS meet_type_lifts CASCADE;
+DROP TABLE IF EXISTS meets CASCADE;
+DROP TABLE IF EXISTS meet_types CASCADE;
+DROP TABLE IF EXISTS lifts CASCADE;
+DROP TABLE IF EXISTS athletes CASCADE;
+DROP TABLE IF EXISTS teams CASCADE;
+DROP TABLE IF EXISTS judges CASCADE;
+DROP TABLE IF EXISTS user_federations CASCADE;
+DROP TABLE IF EXISTS federations CASCADE;
+-- DROP TABLE IF EXISTS users CASCADE;  -- NON TOCCARE!
+DROP TABLE IF EXISTS weight_categories_std CASCADE;
+DROP TABLE IF EXISTS age_categories_std CASCADE;
+DROP TYPE IF EXISTS sex CASCADE;
+
+/* ---------------------------
+  STEP 2: CREATE TYPES
+---------------------------- */
+
+CREATE TYPE sex AS ENUM ('M', 'F');
+
+/* ---------------------------
+  STEP 3: CREATE TABLES
+  ✅ Corretti: SERIAL PRIMARY KEY su tutte le tabelle con ID
+---------------------------- */
 
 /* ---------------------------
   Dati utili in ogni fase della gara
 ---------------------------- */
-
-CREATE TYPE sex AS ENUM ('M', 'F');
 
 CREATE TABLE lifts (
     id          VARCHAR(5) PRIMARY KEY,   -- es: 'SQ', 'PU', 'DIP'
@@ -33,7 +78,7 @@ CREATE INDEX idx_meet_type_lifts_lift ON meet_type_lifts(lift_id);
   STANDARD Categories
 ---------------------------- */
 CREATE TABLE weight_categories_std (
-  id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id       BIGSERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   name     VARCHAR(50) NOT NULL UNIQUE,            -- es: "+101", "U101", "-94" o "Men -94" 
   sex      SEX NOT NULL,
   min_kg   DECIMAL(5,2) NOT NULL DEFAULT 0,        -- limite inferiore INCLUSIVO
@@ -44,7 +89,7 @@ CREATE TABLE weight_categories_std (
 );
 
 CREATE TABLE age_categories_std (
-  id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id       BIGSERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   name     VARCHAR(50) NOT NULL UNIQUE,  -- es: "U18", "Senior", "Master 40-49"
   min_age  SMALLINT,                     -- NULL = nessun limite inferiore
   max_age  SMALLINT,                     -- NULL = nessun limite superiore
@@ -54,38 +99,21 @@ CREATE TABLE age_categories_std (
 );
 
 /* ---------------------------
-  Fine dati utili in ogni fase della gara
+  Entità coinvolte nella gestione della gara
 ---------------------------- */
 
-
-/* ---------------------------
-  Dati a tutte le entita coinvolte nella gestione della gara
----------------------------- */
-/* ---------------------------
-  Users (Organizing Bodies)
-  Managed via Supabase Auth:
-  - each row corresponds to a Supabase user (auth.users.id)
-  - passwords are NOT stored here (handled by Supabase)
-  - a role is assigned to each federated user
----------------------------- */
-CREATE TABLE users (
-  id          SERIAL PRIMARY KEY,
-  auth_uid    UUID NOT NULL UNIQUE,     -- Supabase auth.users.id
-  name        TEXT NOT NULL,            -- display name
-  role        TEXT NOT NULL CHECK (role IN ('SUPER_ADMIN','ADMIN','ORGANIZER','REFEREE','DIRECTOR')),
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  FOREIGN KEY (auth_uid) REFERENCES auth.users(id) ON DELETE CASCADE
-);
+-- NON MODIFICATA: users (gestita da Supabase Auth)
+-- Se non esiste, la tabella users dovrebbe già esistere nel tuo database
 
 CREATE TABLE federations (
-  id          SERIAL PRIMARY KEY,
+  id          SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   name        TEXT NOT NULL UNIQUE,         -- es: "STREET LIFTING ITALIA"
   code        VARCHAR(10) NOT NULL UNIQUE,  -- es: "SLI"
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE user_federations (
-  id              SERIAL PRIMARY KEY,
+  id              SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   user_id         INTEGER NOT NULL,
   federation_id   INTEGER NOT NULL,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
@@ -95,24 +123,23 @@ CREATE TABLE user_federations (
 );
 
 CREATE TABLE judges (
-  id            SERIAL PRIMARY KEY,
+  id            SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   user_id       INTEGER NOT NULL,
   first_name    TEXT NOT NULL,
   last_name     TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('HEAD', 'LEFT', 'RIGHT')),
-  FOREIGN KEY (user_id)       REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE teams (
-  id            SERIAL PRIMARY KEY,
+  id            SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   name          TEXT NOT NULL UNIQUE,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX idx_teams_name ON teams(name);
 
-
 CREATE TABLE athletes (
-  id            SERIAL PRIMARY KEY,
+  id            SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   cf            TEXT NOT NULL UNIQUE,
   first_name    TEXT NOT NULL,
   last_name     TEXT NOT NULL,
@@ -121,7 +148,7 @@ CREATE TABLE athletes (
 );
 
 CREATE TABLE meets (
-  id               SERIAL PRIMARY KEY,
+  id               SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   federation_id    INTEGER,
   meet_code        TEXT NOT NULL UNIQUE,  -- Identificatore univoco cross-database (es: "SLI-2025-01")
   name             TEXT NOT NULL,
@@ -136,21 +163,17 @@ CREATE TABLE meets (
   FOREIGN KEY (meet_type_id) REFERENCES meet_types(id)
 );
 
-/* ---------------------------
-  Fine dati a tutte le entita coinvolte nella gestione della gara
----------------------------- */
-
 /* ---------------------------------------------------------
-  Dati form di registrazione
+  Form di registrazione
 --------------------------------------------------------- */
 
 CREATE TABLE form_info (
-  id                 SERIAL PRIMARY KEY,
+  id                 SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   meet_id            INTEGER NOT NULL,
   athlete_id         INTEGER NOT NULL,
   team_id            INTEGER,
-  weight_cat_id      INTEGER NOT NULL,
-  age_cat_id         INTEGER NOT NULL,
+  weight_cat_id      BIGINT NOT NULL,  -- FK to weight_categories_std (BIGINT)
+  age_cat_id         BIGINT NOT NULL,  -- FK to age_categories_std (BIGINT)
   UNIQUE (meet_id, athlete_id),
   FOREIGN KEY (meet_id)       REFERENCES meets(id)             ON DELETE CASCADE,
   FOREIGN KEY (athlete_id)    REFERENCES athletes(id)          ON DELETE CASCADE,
@@ -170,10 +193,10 @@ CREATE TABLE form_lifts (
 );
 
 /* ---------------------------
-   Flights & Groups
+   Flights & Groups (✅ CORRETTO CON SERIAL)
 ---------------------------- */
 CREATE TABLE flights (
-  id          INTEGER PRIMARY KEY,
+  id          SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY (era INTEGER)
   meet_id     INTEGER NOT NULL,
   name        TEXT NOT NULL,             -- es: "Flight A (Mattina)"
   ord         INTEGER NOT NULL,
@@ -184,7 +207,7 @@ CREATE TABLE flights (
 );
 
 CREATE TABLE groups (
-  id         INTEGER PRIMARY KEY,
+  id         SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY (era INTEGER)
   flight_id  INTEGER NOT NULL,
   name       TEXT NOT NULL,              -- es: "Gruppo 1 (-80)"
   ord        INTEGER NOT NULL,
@@ -193,12 +216,12 @@ CREATE TABLE groups (
 );
 
 CREATE TABLE nomination (
-  id         INTEGER PRIMARY KEY,
+  id         SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY (era INTEGER)
   group_id   INTEGER NOT NULL,
-  form_id     INTEGER NOT NULL,           -- atleta (registrazione) assegnato al group
+  form_id    INTEGER NOT NULL,           -- atleta (registrazione) assegnato al group
   UNIQUE (group_id, form_id),
-  FOREIGN KEY (group_id) REFERENCES groups(id)          ON DELETE CASCADE,
-  FOREIGN KEY (form_id)   REFERENCES form_info(id)   ON DELETE CASCADE
+  FOREIGN KEY (group_id) REFERENCES groups(id)    ON DELETE CASCADE,
+  FOREIGN KEY (form_id)  REFERENCES form_info(id) ON DELETE CASCADE
 );
 
 /* ---------------------------------------------------------
@@ -206,7 +229,7 @@ CREATE TABLE nomination (
 --------------------------------------------------------- */
 
 CREATE TABLE weight_in_info (
-  id                 INTEGER PRIMARY KEY,
+  id                 SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY (era INTEGER)
   nomination_id      INTEGER NOT NULL UNIQUE,      -- riferimento a nomination
   bodyweight_kg      REAL,
   rack_height        INTEGER NOT NULL DEFAULT 0,  -- altezza del rack
@@ -217,26 +240,24 @@ CREATE TABLE weight_in_info (
 );
 
 /* ---------------------------
-  Dati gara 
+  Dati gara (✅ CORRETTO CON SERIAL)
 ---------------------------- */
-/* ---------------------------
-  Attempts (including openers)
----------------------------- */
+
 CREATE TABLE attempts (
-  id               INTEGER PRIMARY KEY,
+  id                SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY (era INTEGER)
   weight_in_info_id INTEGER NOT NULL,        -- riferimento a weight_in_info
-  lift_id          TEXT NOT NULL,
-  attempt_no       INTEGER NOT NULL CHECK (attempt_no BETWEEN 1 AND 4), -- 1,2,3 (4 = if judges allow 4th attempt)
-  weight_kg        NUMERIC(10,2) NOT NULL,           -- Attempt 1 = opener dichiarato alla pesa
-  status           TEXT NOT NULL DEFAULT 'PENDING'
-                    CHECK (status IN ('PENDING','VALID','INVALID')),
+  lift_id           TEXT NOT NULL,
+  attempt_no        INTEGER NOT NULL CHECK (attempt_no BETWEEN 1 AND 4), -- 1,2,3 (4 = if judges allow 4th attempt)
+  weight_kg         NUMERIC(10,2) NOT NULL,           -- Attempt 1 = opener dichiarato alla pesa
+  status            TEXT NOT NULL DEFAULT 'PENDING'
+                     CHECK (status IN ('PENDING','VALID','INVALID')),
   UNIQUE (weight_in_info_id, lift_id, attempt_no),
   FOREIGN KEY (weight_in_info_id) REFERENCES weight_in_info(id) ON DELETE CASCADE,
   FOREIGN KEY (lift_id) REFERENCES lifts(id)
 );
 
 CREATE TABLE current_state (
-  id                        INTEGER PRIMARY KEY CHECK (id = 1), -- singleton: solo 1 riga
+  id                        SERIAL PRIMARY KEY CHECK (id = 1), -- singleton: solo 1 riga
   meet_id                   INTEGER,
   current_flight_id         INTEGER,
   current_group_id          INTEGER,
@@ -250,15 +271,14 @@ CREATE TABLE current_state (
   FOREIGN KEY (current_lift_id)           REFERENCES lifts(id)
 );
 
-
 /* ---------------------------
-  Dati post -gara: Records & Results
+  Dati post-gara: Records & Results
 ---------------------------- */
 
 CREATE TABLE records (
-  id               SERIAL PRIMARY KEY,
-  weight_cat_id    INTEGER NOT NULL,
-  age_cat_id       INTEGER NOT NULL,
+  id               SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
+  weight_cat_id    BIGINT NOT NULL,
+  age_cat_id       BIGINT NOT NULL,
   lift             VARCHAR(5) NOT NULL,
   record_kg        NUMERIC(10,2) NOT NULL,
   bodyweight_kg    DECIMAL(5,2) NOT NULL, -- peso dell'atleta quando ha stabilito il record
@@ -276,11 +296,11 @@ CREATE TABLE records (
 );
 
 CREATE TABLE results (
-  id               SERIAL PRIMARY KEY,
+  id               SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY
   meet_id          INTEGER NOT NULL,
   athlete_id       INTEGER,               -- NULL se atleta non in athletes
-  weight_cat_id    INTEGER NOT NULL,
-  age_cat_id       INTEGER NOT NULL,
+  weight_cat_id    BIGINT NOT NULL,
+  age_cat_id       BIGINT NOT NULL,
   total_kg         NUMERIC(10,2) NOT NULL, -- somma delle alzate previste dalla gara
   points           NUMERIC(10,2) NOT NULL, -- calcolato in base a regulation_code
   final_placing    INTEGER,               -- posizione in classifica
@@ -300,11 +320,6 @@ CREATE TABLE result_lifts (
   FOREIGN KEY (result_id) REFERENCES results(id) ON DELETE CASCADE,
   FOREIGN KEY (lift_id)   REFERENCES lifts(id)
 );
-
-/* ---------------------------
-  Fine Dati post -gara: Records & Results
----------------------------- */
-
 
 /* ============================================
    INDICI PER OTTIMIZZAZIONE PERFORMANCE
@@ -390,9 +405,9 @@ CREATE INDEX idx_meets_type ON meets(meet_type_id);
 CREATE INDEX idx_meets_date ON meets(start_date);
 CREATE INDEX idx_meets_level ON meets(level);
 
--- Indici per users (autenticazione)
-CREATE INDEX idx_users_auth_uid ON users(auth_uid);
-CREATE INDEX idx_users_role ON users(role);
+-- Indici per users (autenticazione) - SE ESISTE
+-- CREATE INDEX idx_users_auth_uid ON users(auth_uid);
+-- CREATE INDEX idx_users_role ON users(role);
 
 -- Indici per federations
 CREATE INDEX idx_federations_code ON federations(code);
@@ -409,8 +424,9 @@ CREATE INDEX idx_weight_cat_ord ON weight_categories_std(ord);
 -- Indici per age_categories_std
 CREATE INDEX idx_age_cat_ord ON age_categories_std(ord);
 
-
-/* Initial data std categories */
+/* ============================================
+   INITIAL DATA
+============================================ */
 
 INSERT INTO weight_categories_std (name, sex, min_kg, max_kg, ord)
 VALUES
@@ -440,8 +456,6 @@ VALUES
   ('Master II',  50,  59, 4),
   ('Master III', 60,  69, 5),
   ('Master IV',  70,  NULL, 6);
-
-/* Initial data for lifts and meet types */
 
 INSERT INTO lifts (id, name) VALUES
     ('SQ',  'Squat'),
@@ -480,14 +494,14 @@ INSERT INTO meet_type_lifts (meet_type_id, lift_id, sequence) VALUES
     ('S_SQ',   'SQ',  1),
     ('S_MP',   'MP',  1);
 
-
+-- Populate records table with default values
 INSERT INTO records (weight_cat_id, age_cat_id, lift, record_kg, bodyweight_kg, meet_code, set_date, athlete_id)
 SELECT
     w.id  AS weight_cat_id,
     a.id  AS age_cat_id,
     l.id  AS lift,
     0     AS record_kg,
-    0     AS bodyweight_kg,    -- valore di default per i record iniziali
+    0     AS bodyweight_kg,
     NULL  AS meet_code,
     NULL  AS set_date,
     NULL  AS athlete_id

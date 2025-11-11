@@ -56,9 +56,6 @@ export async function verifyToken(
       role: decoded.role || 'ORGANIZER',
     };
 
-    // Debug log
-    console.log(`Token verified (LOCAL): User ${decoded.email}`);
-
     // 4. Pass to controller
     next();
 

@@ -62,7 +62,6 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
 
   // Load existing meet data if in edit mode
   useEffect(() => {
-    console.log('InfoTab: existingMeetId changed to:', existingMeetId);
     if (existingMeetId) {
       loadExistingMeet();
     }
@@ -71,7 +70,6 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
   const loadExistingMeet = async () => {
     if (!existingMeetId) return;
 
-    console.log('Loading meet with ID:', existingMeetId);
     setLoadingMeet(true);
     setError(null);
     
@@ -94,7 +92,6 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
       }
 
       if (data) {
-        console.log('Meet data loaded successfully:', data);
         setFormData({
           competition_name: data.name,
           competition_type: data.meet_type_id,
@@ -104,8 +101,6 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
           regulation_code: data.regulation_code,
           score_type: data.score_type || 'RIS'
         });
-      } else {
-        console.warn('Meet not found with ID:', meetIdNum);
       }
     } catch (err: any) {
       console.error('Error loading meet:', err);

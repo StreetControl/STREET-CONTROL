@@ -140,17 +140,12 @@ export async function getUserInfos(req: AuthRequest, res: Response): Promise<Res
     let judgePosition: JudgePosition | null = null;
     let judgeId: number | null = null;
     
-    console.log('User role:', user.role);
-    
     if (user.role === 'REFEREE') {
       const { data: judgeData, error: judgeError } = await supabaseAdmin
         .from('judges')
         .select('id, role')
         .eq('user_id', user.id)
         .single();
-
-      console.log('Judge data:', judgeData);
-      console.log('Judge error:', judgeError);
 
       if (!judgeError && judgeData) {
         judgePosition = judgeData.role as JudgePosition;

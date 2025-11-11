@@ -80,7 +80,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error || !currentSession) {
-          console.log('No active session to restore');
           // Clear localStorage and state if no session
           localStorage.removeItem(STORAGE_KEYS.USER);
           localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
@@ -106,8 +105,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             localStorage.removeItem(STORAGE_KEYS.USER);
             localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
           }
-        } else {
-          console.log('User and role restored from localStorage');
         }
         
       } catch (err) {
@@ -169,7 +166,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       // Fetch user info (now API has the token)
       const userData = await fetchUserInfo();
-      console.log('User logged in:', userData);
       
       // Save user to localStorage
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
@@ -254,7 +250,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const clearActiveRole = (): void => {
     setActiveRole(null);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
-    console.log('Active role cleared');
   };
 
   /**

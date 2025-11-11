@@ -187,10 +187,7 @@ ${exampleRow2Values.join(',')}`;
       const headerLine = lines[0];
       const headers = headerLine.split(',').map(h => h.trim());
       
-      console.log('📋 CSV Headers detected:', headers);
-      
       const dataLines = lines.slice(1);
-      console.log(`📊 Total data lines to process: ${dataLines.length}`);
       
       const parsedAthletes = dataLines.map((line, index) => {
         try {
@@ -228,18 +225,14 @@ ${exampleRow2Values.join(',')}`;
 
           return athlete;
         } catch (rowError: any) {
-          console.error(`❌ Error parsing row ${index + 2}:`, line);
+          console.error(`Error parsing row ${index + 2}:`, line);
           throw new Error(`Errore alla riga ${index + 2}: ${rowError.message}`);
         }
       });
 
-      console.log(`📤 Sending ${parsedAthletes.length} athletes to backend...`);
-
       const response = await bulkImportAthletes(parseInt(meetId), {
         athletes: parsedAthletes
       });
-
-      console.log('📥 Backend response:', response);
 
       if (response.success) {
         const { results } = response;
@@ -256,7 +249,7 @@ ${exampleRow2Values.join(',')}`;
       }
 
     } catch (err: any) {
-      console.error('❌ Import error:', err);
+      console.error('Import error:', err);
       setError(err.response?.data?.error || err.message || 'Errore durante la lettura del file CSV');
     } finally {
       setIsLoading(false);

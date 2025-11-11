@@ -199,7 +199,6 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     const athleteId = parseInt(e.dataTransfer.getData('athleteId'));
     
     // TODO: Implement drag & drop logic in STEP 3
-    console.log('Drag athlete', athleteId, 'to flight', targetFlightId, 'group', targetGroupId);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -350,7 +349,6 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                         value={athlete.flight_id}
                         onChange={(e) => {
                           // TODO: Handle flight change
-                          console.log('Change flight to', e.target.value);
                         }}
                         className="bg-dark-bg-secondary border border-dark-border rounded px-2 py-1 text-sm text-dark-text"
                       >
@@ -364,7 +362,6 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                         value={athlete.group_id}
                         onChange={(e) => {
                           // TODO: Handle group change
-                          console.log('Change group to', e.target.value);
                         }}
                         className="bg-dark-bg-secondary border border-dark-border rounded px-2 py-1 text-sm text-dark-text"
                       >

@@ -215,8 +215,6 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       });
     }
 
-    console.log(`🔄 Starting bulk import: ${athletes.length} athletes for meet ${meetId}`);
-
     const results = {
       success: 0,
       failed: 0,
@@ -318,13 +316,11 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
     const defaultWeightCatF = allWeightCategories.find(w => w.sex === 'F');
 
     if (!defaultWeightCatM || !defaultWeightCatF) {
-      return res.status(500).json({
+      return res.status(400).json({
         success: false,
         error: 'Default weight categories not found in database'
       });
     }
-
-    console.log(`📊 Pre-loaded: ${weightCatMapM.size} male weight categories, ${weightCatMapF.size} female weight categories`);
 
     // ============================================
     // STEP 1: Pre-load existing data (BATCH)
@@ -348,8 +344,6 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
 
     const teamMap = new Map(existingTeams?.map(t => [t.name, t.id]) || []);
 
-    console.log(`📊 Pre-loaded: ${athleteMap.size} existing athletes, ${teamMap.size} existing teams`);
-
     // Load existing form_info for this meet (to skip already registered)
     const { data: existingFormInfos } = await supabaseAdmin
       .from('form_info')
@@ -357,7 +351,6 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       .eq('meet_id', meetId);
 
     const registeredAthleteIds = new Set(existingFormInfos?.map(f => f.athlete_id) || []);
-    console.log(`📊 Pre-loaded: ${registeredAthleteIds.size} already registered athletes for this meet`);
 
     // ============================================
     // STEP 2: Process athletes in BATCHES of 20
@@ -369,8 +362,6 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       const batchStart = batchIndex * BATCH_SIZE;
       const batchEnd = Math.min(batchStart + BATCH_SIZE, athletes.length);
       const batch = athletes.slice(batchStart, batchEnd);
-
-      console.log(`🔄 Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} athletes)`);
 
       for (const athlete of batch) {
         try {
@@ -406,9 +397,7 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
                 .select('id')
                 .single();
 
-              if (teamError) {
-                console.warn(`Failed to create team "${team}": ${teamError.message}`);
-              } else {
+              if (!teamError && newTeam) {
                 teamId = newTeam.id;
                 teamMap.set(team.trim(), newTeam.id); // Add to cache
               }
@@ -470,9 +459,8 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
             if (foundWeightCatId) {
               weightCatId = foundWeightCatId;
             } else {
-              // Categoria non trovata, usa default e logga warning
+              // Categoria non trovata, usa default
               weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
-              console.warn(`Athlete ${cf}: Weight category "${athlete.weightCategory}" not found, using default`);
             }
           } else {
             // Nessuna categoria specificata, usa default
@@ -539,8 +527,7 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
             .insert(formLiftsToInsert);
 
           if (formLiftsError) {
-            console.warn(`Athlete ${cf}: Failed to save declared maxes - ${formLiftsError.message}`);
-            // Don't fail the entire import, just log warning
+            // Don't fail the entire import, just skip
           }
         }
 
@@ -551,11 +538,7 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
         results.errors.push(`Athlete ${athlete.cf || 'unknown'}: ${err.message}`);
       }
     } // Fine loop atleti
-
-    console.log(`✅ Batch ${batchIndex + 1}/${totalBatches} completed: ${results.success} success, ${results.failed} failed`);
   } // Fine loop batch
-
-  console.log(`🎉 Bulk import completed: ${results.success}/${athletes.length} athletes imported`);
 
     return res.status(200).json({
       success: true,

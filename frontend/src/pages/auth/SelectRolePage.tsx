@@ -18,7 +18,6 @@ const SelectRolePage = () => {
   // Redirect if user already has an active role
   useEffect(() => {
     if (!loading && hasActiveRole && activeRole) {
-      console.log('User already has active role, redirecting to /meets');
       navigate('/meets', { replace: true });
     }
   }, [hasActiveRole, activeRole, loading, navigate]);
@@ -36,7 +35,6 @@ const SelectRolePage = () => {
   const handleRoleSelect = async (role: AvailableRole) => {
     setError('');
     setSelectedRole(role.role);
-    console.log(`Selecting role: ${role.role}`);
     
     // Pass role string (not ID) to backend
     const result = await selectRole(role.role);
