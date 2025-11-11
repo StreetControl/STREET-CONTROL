@@ -157,6 +157,16 @@ CREATE TABLE form_info (
   FOREIGN KEY (age_cat_id)    REFERENCES age_categories_std(id)
 );
 
+-- Massimali dichiarati dall'atleta per ogni alzata (importati da CSV)
+CREATE TABLE form_lifts (
+  form_id          INTEGER NOT NULL,
+  lift_id          VARCHAR(5) NOT NULL,
+  declared_max_kg  NUMERIC(10,2) NOT NULL,
+  PRIMARY KEY (form_id, lift_id),
+  FOREIGN KEY (form_id) REFERENCES form_info(id) ON DELETE CASCADE,
+  FOREIGN KEY (lift_id) REFERENCES lifts(id) ON DELETE RESTRICT
+);
+
 /* ---------------------------
    Flights & Groups
 ---------------------------- */
@@ -318,6 +328,10 @@ CREATE INDEX idx_form_info_team ON form_info(team_id);
 CREATE INDEX idx_form_info_weight_cat ON form_info(weight_cat_id);
 CREATE INDEX idx_form_info_age_cat ON form_info(age_cat_id);
 CREATE INDEX idx_form_info_categories ON form_info(weight_cat_id, age_cat_id);
+
+-- Indici per form_lifts (massimali dichiarati)
+CREATE INDEX idx_form_lifts_form ON form_lifts(form_id);
+CREATE INDEX idx_form_lifts_lift ON form_lifts(lift_id);
 
 -- Indici per weight_in_info (pesatura e dati pre-gara)
 CREATE INDEX idx_weight_in_nomination ON weight_in_info(nomination_id);

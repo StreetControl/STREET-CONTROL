@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMeetAthletes, bulkImportAthletes } from '../../services/api';
+import { supabase } from '../../services/supabase';
 
 interface AthleteRow {
   cf: string;
@@ -24,6 +25,7 @@ export default function RegistrationTab({ meetId }: RegistrationTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [athletes, setAthletes] = useState<AthleteRow[]>([]);
+  const [meetTypeLifts, setMeetTypeLifts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -31,6 +33,7 @@ export default function RegistrationTab({ meetId }: RegistrationTabProps) {
   useEffect(() => {
     if (meetId) {
       loadAthletes();
+      loadMeetTypeLifts();
     }
   }, [meetId]);
 
@@ -57,24 +60,93 @@ export default function RegistrationTab({ meetId }: RegistrationTabProps) {
     }
   };
 
+  const loadMeetTypeLifts = async () => {
+    if (!meetId) return;
+
+    try {
+      // Get meet info to find meet_type_id
+      const { data: meet, error: meetError } = await supabase
+        .from('meets')
+        .select('meet_type_id')
+        .eq('id', parseInt(meetId))
+        .single();
+
+      if (meetError || !meet) {
+        console.error('Error loading meet type:', meetError);
+        return;
+      }
+
+      // Get lifts for this meet type
+      const { data: lifts, error: liftsError } = await supabase
+        .from('meet_type_lifts')
+        .select('lift_id')
+        .eq('meet_type_id', meet.meet_type_id)
+        .order('sequence');
+
+      if (liftsError) {
+        console.error('Error loading lifts:', liftsError);
+        return;
+      }
+
+      const liftIds = lifts?.map((l: { lift_id: string }) => l.lift_id) || [];
+      setMeetTypeLifts(liftIds);
+    } catch (err) {
+      console.error('Error loading meet type lifts:', err);
+    }
+  };
+
   const downloadTemplate = () => {
-    const csvContent = `first_name,last_name,birth_date,weight_category,sex,cf,team,max_sq,max_pu,max_dip,max_mp,max_mu
-# Note: The 'max_*' columns (max_sq, max_pu, max_dip, max_mp, max_mu) should be dynamically selected based on the meet type:
-# - STREET_4: requires max_mu, max_pu, max_dip, max_sq (4 lifts)
-# - STREET_3: requires max_pu, max_dip, max_sq (3 lifts)
-# - PUSH_PULL: requires max_pu, max_dip (2 lifts)
-# - S_PU (Single Lift Pull-Up): requires only max_pu
-# - S_DIP (Single Lift Dip): requires only max_dip
-# - S_MU (Single Lift Muscle-Up): requires only max_mu
-# - S_SQ (Single Lift Squat): requires only max_sq
-# - S_MP (Single Lift Military-Press): requires only max_mp
-# Only fill in the max_* columns that are relevant for your specific meet type. Leave unused columns empty.
-# Date format: YYYY-MM-DD
-# Weight category format: (e.g., '-59M', '-66M', '-73M', '-80M', '-87M', '-94M', '-101M', '+101M' for men; '-52F', '-57F', '-63F', '-70F', '+70F' for women)
-# Sex: M or F
-# Example rows:
-Mario,Rossi,1995-06-15,-80M,M,RSSMRA95H15H501Z,Team Alpha,120.5,15,25,,
-Giulia,Bianchi,1998-03-22,-63F,F,BNCGLI98C62H501Y,Team Beta,80.0,10,18,,`;
+    // ORDINE FISSO E CONSISTENTE: MU, PU, DIP, SQ, MP
+    const LIFT_ORDER = ['MU', 'PU', 'DIP', 'SQ', 'MP'];
+    const LIFT_MAP: Record<string, string> = {
+      'MU': 'max_mu',
+      'PU': 'max_pu',
+      'DIP': 'max_dip',
+      'SQ': 'max_sq',
+      'MP': 'max_mp'
+    };
+
+    // Filtra solo le alzate presenti in questa gara, mantenendo l'ordine fisso
+    const liftColumns = LIFT_ORDER
+      .filter(liftId => meetTypeLifts.includes(liftId))
+      .map(liftId => LIFT_MAP[liftId]);
+
+    // Base columns
+    const baseColumns = 'first_name,last_name,birth_date,weight_category,sex,cf,team';
+    
+    // Full header with dynamic lift columns IN FIXED ORDER
+    const header = `${baseColumns},${liftColumns.join(',')}`;
+    
+    // Build example rows with correct number of commas
+    const exampleRow1Values = ['Mario', 'Rossi', '1995-06-15', '-80M', 'M', 'RSSMRA95H15H501Z', 'IronChurch'];
+    const exampleRow2Values = ['Giulia', 'Bianchi', '1998-03-22', '-63F', 'F', 'BNCGLI98C62H501Y', 'CaliFlorence'];
+    
+    // Add example weights IN THE SAME ORDER as columns
+    const exampleWeights: Record<string, number> = {
+      'max_mu': 15,
+      'max_pu': 60,
+      'max_dip': 90,
+      'max_sq': 160,
+      'max_mp': 50
+    };
+
+    liftColumns.forEach(colName => {
+      exampleRow1Values.push(exampleWeights[colName]?.toString() || '0');
+      exampleRow2Values.push((exampleWeights[colName] ? exampleWeights[colName] - 5 : 0).toString());
+    });
+
+    const liftNamesForComment = LIFT_ORDER.filter(l => meetTypeLifts.includes(l)).join(', ');
+    
+    const csvContent = `${header}
+# Campi richiesti: first_name, last_name, birth_date, sex, cf
+# Campi opzionali: weight_category, team, ${liftColumns.join(', ')}
+# Alzate per questa gara: ${liftNamesForComment}
+# Formato data: YYYY-MM-DD
+# Formato categoria peso: es. '-59M', '-66M', '-73M', '-80M', '+101M' (uomini); '-52F', '-57F', '-63F', '+70F' (donne)
+# Sesso: M o F
+# Esempi:
+${exampleRow1Values.join(',')}
+${exampleRow2Values.join(',')}`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -105,25 +177,42 @@ Giulia,Bianchi,1998-03-22,-63F,F,BNCGLI98C62H501Y,Team Beta,80.0,10,18,,`;
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
       
+      if (lines.length < 2) {
+        throw new Error('File CSV vuoto o senza dati');
+      }
+
+      // Parse header to get column order
+      const headerLine = lines[0];
+      const headers = headerLine.split(',').map(h => h.trim());
+      
       const dataLines = lines.slice(1);
       
       const parsedAthletes = dataLines.map(line => {
         const parts = line.split(',').map(s => s.trim());
-        const [firstName, lastName, birthDate, weightCategory, sex, cf, team, maxSq, maxPu, maxDip, maxMp, maxMu] = parts;
         
+        // Create object mapping header → value
+        const rowData: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          rowData[header] = parts[index] || '';
+        });
+
+        // Extract values using header names (case-insensitive)
+        const getVal = (key: string) => rowData[key] || rowData[key.toLowerCase()] || '';
+
         return { 
-          cf, 
-          firstName, 
-          lastName, 
-          sex: sex as 'M' | 'F', 
-          birthDate,
-          weightCategory: weightCategory || undefined,
-          team: team || undefined,
-          maxSq: maxSq ? parseFloat(maxSq) : undefined,
-          maxPu: maxPu ? parseFloat(maxPu) : undefined,
-          maxDip: maxDip ? parseFloat(maxDip) : undefined,
-          maxMp: maxMp ? parseFloat(maxMp) : undefined,
-          maxMu: maxMu ? parseFloat(maxMu) : undefined
+          cf: getVal('cf'),
+          firstName: getVal('first_name'),
+          lastName: getVal('last_name'),
+          sex: getVal('sex') as 'M' | 'F',
+          birthDate: getVal('birth_date'),
+          weightCategory: getVal('weight_category') || undefined,
+          team: getVal('team') || undefined,
+          // Parse lift maxes from correct columns
+          maxMu: getVal('max_mu') ? parseFloat(getVal('max_mu')) : undefined,
+          maxPu: getVal('max_pu') ? parseFloat(getVal('max_pu')) : undefined,
+          maxDip: getVal('max_dip') ? parseFloat(getVal('max_dip')) : undefined,
+          maxSq: getVal('max_sq') ? parseFloat(getVal('max_sq')) : undefined,
+          maxMp: getVal('max_mp') ? parseFloat(getVal('max_mp')) : undefined
         };
       });
 

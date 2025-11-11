@@ -255,7 +255,7 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
     // Process each athlete
     for (const athlete of athletes) {
       try {
-        const { cf, firstName, lastName, sex, birthDate } = athlete;
+        const { cf, firstName, lastName, sex, birthDate, team } = athlete;
 
         // Validation
         if (!cf || !firstName || !lastName || !sex || !birthDate) {
@@ -270,6 +270,42 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
           continue;
         }
 
+        // ============================================
+        // GESTIONE TEAM (stessa logica degli atleti)
+        // ============================================
+        let teamId: number | null = null;
+
+        if (team && team.trim()) {
+          // Check if team exists
+          const { data: existingTeam } = await supabaseAdmin
+            .from('teams')
+            .select('id')
+            .eq('name', team.trim())
+            .single();
+
+          if (existingTeam) {
+            // Team exists, use existing ID
+            teamId = existingTeam.id;
+          } else {
+            // Create new team
+            const { data: newTeam, error: teamError } = await supabaseAdmin
+              .from('teams')
+              .insert({ name: team.trim() })
+              .select('id')
+              .single();
+
+            if (teamError) {
+              console.warn(`Failed to create team "${team}": ${teamError.message}`);
+              // Don't fail import, just skip team assignment
+            } else {
+              teamId = newTeam.id;
+            }
+          }
+        }
+
+        // ============================================
+        // GESTIONE ATLETA
+        // ============================================
         // Check if athlete exists
         const { data: existingAthlete } = await supabaseAdmin
           .from('athletes')
@@ -321,19 +357,54 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
         // Register for meet
         const weightCatId = sex === 'M' ? weightCatM.id : weightCatF.id;
 
-        const { error: formError } = await supabaseAdmin
+        const { data: formInfo, error: formError } = await supabaseAdmin
           .from('form_info')
           .insert({
             meet_id: parseInt(meetId),
             athlete_id: athleteId,
+            team_id: teamId, // ← AGGIUNGI TEAM_ID
             weight_cat_id: weightCatId,
             age_cat_id: ageCat.id
-          });
+          })
+          .select('id')
+          .single();
 
-        if (formError) {
+        if (formError || !formInfo) {
           results.failed++;
-          results.errors.push(`Athlete ${cf}: Failed to register - ${formError.message}`);
+          results.errors.push(`Athlete ${cf}: Failed to register - ${formError?.message || 'Unknown error'}`);
           continue;
+        }
+
+        // Save declared maxes (form_lifts) if provided
+        const { maxSq, maxPu, maxDip, maxMp, maxMu } = athlete;
+        const formLiftsToInsert: Array<{ form_id: number; lift_id: string; declared_max_kg: number }> = [];
+
+        if (maxSq && !isNaN(maxSq) && maxSq > 0) {
+          formLiftsToInsert.push({ form_id: formInfo.id, lift_id: 'SQ', declared_max_kg: maxSq });
+        }
+        if (maxPu && !isNaN(maxPu) && maxPu > 0) {
+          formLiftsToInsert.push({ form_id: formInfo.id, lift_id: 'PU', declared_max_kg: maxPu });
+        }
+        if (maxDip && !isNaN(maxDip) && maxDip > 0) {
+          formLiftsToInsert.push({ form_id: formInfo.id, lift_id: 'DIP', declared_max_kg: maxDip });
+        }
+        if (maxMp && !isNaN(maxMp) && maxMp > 0) {
+          formLiftsToInsert.push({ form_id: formInfo.id, lift_id: 'MP', declared_max_kg: maxMp });
+        }
+        if (maxMu && !isNaN(maxMu) && maxMu > 0) {
+          formLiftsToInsert.push({ form_id: formInfo.id, lift_id: 'MU', declared_max_kg: maxMu });
+        }
+
+        // Insert declared maxes into form_lifts
+        if (formLiftsToInsert.length > 0) {
+          const { error: formLiftsError } = await supabaseAdmin
+            .from('form_lifts')
+            .insert(formLiftsToInsert);
+
+          if (formLiftsError) {
+            console.warn(`Athlete ${cf}: Failed to save declared maxes - ${formLiftsError.message}`);
+            // Don't fail the entire import, just log warning
+          }
         }
 
         results.success++;
