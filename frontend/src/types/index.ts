@@ -45,6 +45,13 @@ export type {
   GetAthletesResponse,
   BulkCreateAthletesRequest,
   BulkCreateAthletesResponse,
+  DivisionAthlete,
+  DivisionGroup,
+  DivisionFlight,
+  CreateDivisionResponse,
+  GetDivisionResponse,
+  SaveDivisionRequest,
+  SaveDivisionResponse,
   Lift,
   Attempt,
 } from './api.types';

@@ -34,14 +34,18 @@ import type {
   GetAthletesResponse,
   BulkCreateAthletesRequest,
   BulkCreateAthletesResponse,
+  CreateDivisionResponse,
+  GetDivisionResponse,
+  SaveDivisionRequest,
+  SaveDivisionResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api';
 
-// Create Axios instance
+// Create Axios instance with extended timeout for bulk operations
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 120000, // 120 seconds (2 minutes) for bulk imports and heavy operations
   headers: {
     'Content-Type': 'application/json'
   }
@@ -259,6 +263,34 @@ export async function updateAthleteWeight(data: UpdateAthleteWeightRequest): Pro
  */
 export async function getAthletes(): Promise<GetAthletesResponse> {
   const response = await api.get<GetAthletesResponse>('/athletes');
+  return response.data;
+}
+
+// ============================================
+// DIVISION API
+// ============================================
+
+/**
+ * Create automatic division (flights, groups, nominations)
+ */
+export async function createDivision(meetId: number): Promise<CreateDivisionResponse> {
+  const response = await api.post<CreateDivisionResponse>(`/meets/${meetId}/division/create`);
+  return response.data;
+}
+
+/**
+ * Get current division structure
+ */
+export async function getDivision(meetId: number): Promise<GetDivisionResponse> {
+  const response = await api.get<GetDivisionResponse>(`/meets/${meetId}/division`);
+  return response.data;
+}
+
+/**
+ * Save modified division structure (after drag & drop)
+ */
+export async function saveDivision(meetId: number, data: SaveDivisionRequest): Promise<SaveDivisionResponse> {
+  const response = await api.post<SaveDivisionResponse>(`/meets/${meetId}/division/save`, data);
   return response.data;
 }
 

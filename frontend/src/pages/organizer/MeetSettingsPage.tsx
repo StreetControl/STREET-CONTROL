@@ -135,7 +135,7 @@ export default function MeetSettingsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'info' && <InfoTab onMeetCreated={handleMeetCreated} existingMeetId={createdMeetId} />}
         {activeTab === 'registration' && <RegistrationTab meetId={createdMeetId} />}
-        {activeTab === 'group-division' && <GroupDivisionTab />}
+        {activeTab === 'group-division' && <GroupDivisionTab meetId={createdMeetId} />}
         {activeTab === 'pre-meet' && <PreMeetTab />}
       </div>
     </div>

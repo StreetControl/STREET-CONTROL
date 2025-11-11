@@ -13,6 +13,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import meetsRoutes from './routes/meets.js';
 import athletesRoutes from './routes/athletes.js';
+import divisionRoutes from './routes/division.js';
 
 // Load environment variables
 dotenv.config();
@@ -102,6 +103,9 @@ app.use('/api/meets', meetsRoutes);
 // Athletes routes (nested under meets)
 app.use('/api', athletesRoutes);
 
+// Division routes (nested under meets)
+app.use('/api/meets', divisionRoutes);
+
 // ============================================
 // ERROR HANDLING
 // ============================================
@@ -130,7 +134,7 @@ app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: 
 // START SERVER
 // ============================================
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('============================================');
   console.log(`🏋️  Street Control Backend`);
   console.log(`📡 Server running on port ${PORT}`);
@@ -138,6 +142,9 @@ app.listen(PORT, () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
   console.log('============================================');
 });
+
+// Increase timeout for bulk operations (120 seconds)
+server.timeout = 120000;
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

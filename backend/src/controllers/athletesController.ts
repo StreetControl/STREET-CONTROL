@@ -215,6 +215,8 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       });
     }
 
+    console.log(`🔄 Starting bulk import: ${athletes.length} athletes for meet ${meetId}`);
+
     const results = {
       success: 0,
       failed: 0,
@@ -289,42 +291,31 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
     };
 
     // ============================================
-    // HELPER: Trova categoria peso da nome (es: "-80M", "+70F")
+    // PRE-LOAD: Carica tutte le categorie peso (CACHE)
     // ============================================
-    const findWeightCategoryId = async (weightCatName: string, sex: 'M' | 'F'): Promise<number | null> => {
-      if (!weightCatName || !weightCatName.trim()) {
-        return null;
-      }
-
-      // Cerca per nome esatto
-      const { data: weightCat } = await supabaseAdmin
-        .from('weight_categories_std')
-        .select('id')
-        .eq('name', weightCatName.trim())
-        .eq('sex', sex)
-        .single();
-
-      return weightCat?.id || null;
-    };
-
-    // ============================================
-    // CARICA CATEGORIA PESO DEFAULT (fallback)
-    // ============================================
-    const { data: defaultWeightCatM } = await supabaseAdmin
+    const { data: allWeightCategories } = await supabaseAdmin
       .from('weight_categories_std')
-      .select('id')
-      .eq('sex', 'M')
-      .order('ord')
-      .limit(1)
-      .single();
+      .select('id, name, sex, ord')
+      .order('ord');
 
-    const { data: defaultWeightCatF } = await supabaseAdmin
-      .from('weight_categories_std')
-      .select('id')
-      .eq('sex', 'F')
-      .order('ord')
-      .limit(1)
-      .single();
+    if (!allWeightCategories || allWeightCategories.length === 0) {
+      return res.status(500).json({
+        success: false,
+        error: 'Weight categories not found in database'
+      });
+    }
+
+    // Create maps for fast lookup
+    const weightCatMapM = new Map(
+      allWeightCategories.filter(w => w.sex === 'M').map(w => [w.name, w.id])
+    );
+    const weightCatMapF = new Map(
+      allWeightCategories.filter(w => w.sex === 'F').map(w => [w.name, w.id])
+    );
+
+    // Get default categories (first by order)
+    const defaultWeightCatM = allWeightCategories.find(w => w.sex === 'M');
+    const defaultWeightCatF = allWeightCategories.find(w => w.sex === 'F');
 
     if (!defaultWeightCatM || !defaultWeightCatF) {
       return res.status(500).json({
@@ -333,130 +324,160 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
       });
     }
 
+    console.log(`📊 Pre-loaded: ${weightCatMapM.size} male weight categories, ${weightCatMapF.size} female weight categories`);
+
     // ============================================
-    // Process each athlete
+    // STEP 1: Pre-load existing data (BATCH)
     // ============================================
-    for (const athlete of athletes) {
-      try {
-        const { cf, firstName, lastName, sex, birthDate, team } = athlete;
+    const allCFs = athletes.map(a => a.cf).filter(Boolean);
+    const allTeams = [...new Set(athletes.map(a => a.team).filter(Boolean))];
 
-        // Validation
-        if (!cf || !firstName || !lastName || !sex || !birthDate) {
-          results.failed++;
-          results.errors.push(`Athlete ${cf || 'unknown'}: Missing required fields`);
-          continue;
-        }
+    // Load existing athletes in one query
+    const { data: existingAthletes } = await supabaseAdmin
+      .from('athletes')
+      .select('id, cf')
+      .in('cf', allCFs);
 
-        if (!['M', 'F'].includes(sex)) {
-          results.failed++;
-          results.errors.push(`Athlete ${cf}: Invalid sex (must be M or F)`);
-          continue;
-        }
+    const athleteMap = new Map(existingAthletes?.map(a => [a.cf, a.id]) || []);
 
-        // ============================================
-        // GESTIONE TEAM (stessa logica degli atleti)
-        // ============================================
-        let teamId: number | null = null;
+    // Load existing teams in one query
+    const { data: existingTeams } = await supabaseAdmin
+      .from('teams')
+      .select('id, name')
+      .in('name', allTeams);
 
-        if (team && team.trim()) {
-          // Check if team exists
-          const { data: existingTeam } = await supabaseAdmin
-            .from('teams')
-            .select('id')
-            .eq('name', team.trim())
-            .single();
+    const teamMap = new Map(existingTeams?.map(t => [t.name, t.id]) || []);
 
-          if (existingTeam) {
-            // Team exists, use existing ID
-            teamId = existingTeam.id;
-          } else {
-            // Create new team
-            const { data: newTeam, error: teamError } = await supabaseAdmin
-              .from('teams')
-              .insert({ name: team.trim() })
-              .select('id')
-              .single();
+    console.log(`📊 Pre-loaded: ${athleteMap.size} existing athletes, ${teamMap.size} existing teams`);
 
-            if (teamError) {
-              console.warn(`Failed to create team "${team}": ${teamError.message}`);
-              // Don't fail import, just skip team assignment
-            } else {
-              teamId = newTeam.id;
-            }
-          }
-        }
+    // Load existing form_info for this meet (to skip already registered)
+    const { data: existingFormInfos } = await supabaseAdmin
+      .from('form_info')
+      .select('athlete_id')
+      .eq('meet_id', meetId);
 
-        // ============================================
-        // GESTIONE ATLETA
-        // ============================================
-        // Check if athlete exists
-        const { data: existingAthlete } = await supabaseAdmin
-          .from('athletes')
-          .select('id')
-          .eq('cf', cf)
-          .single();
+    const registeredAthleteIds = new Set(existingFormInfos?.map(f => f.athlete_id) || []);
+    console.log(`📊 Pre-loaded: ${registeredAthleteIds.size} already registered athletes for this meet`);
 
-        let athleteId: number;
+    // ============================================
+    // STEP 2: Process athletes in BATCHES of 20
+    // ============================================
+    const BATCH_SIZE = 20;
+    const totalBatches = Math.ceil(athletes.length / BATCH_SIZE);
 
-        if (existingAthlete) {
-          athleteId = existingAthlete.id;
-        } else {
-          // Create new athlete
-          const { data: newAthlete, error: athleteError } = await supabaseAdmin
-            .from('athletes')
-            .insert({
-              cf,
-              first_name: firstName,
-              last_name: lastName,
-              sex,
-              birth_date: birthDate
-            })
-            .select('id')
-            .single();
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batchStart = batchIndex * BATCH_SIZE;
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, athletes.length);
+      const batch = athletes.slice(batchStart, batchEnd);
 
-          if (athleteError) {
+      console.log(`🔄 Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} athletes)`);
+
+      for (const athlete of batch) {
+        try {
+          const { cf, firstName, lastName, sex, birthDate, team } = athlete;
+
+          // Validation
+          if (!cf || !firstName || !lastName || !sex || !birthDate) {
             results.failed++;
-            results.errors.push(`Athlete ${cf}: Failed to create - ${athleteError.message}`);
+            results.errors.push(`Athlete ${cf || 'unknown'}: Missing required fields`);
             continue;
           }
 
-          athleteId = newAthlete.id;
-        }
-
-        // Check if already registered for this meet
-        const { data: existingFormInfo } = await supabaseAdmin
-          .from('form_info')
-          .select('id')
-          .eq('meet_id', meetId)
-          .eq('athlete_id', athleteId)
-          .single();
-
-        if (existingFormInfo) {
-          results.failed++;
-          results.errors.push(`Athlete ${cf}: Already registered for this meet`);
-          continue;
-        }
-
-        // ============================================
-        // CALCOLA CATEGORIA PESO
-        // ============================================
-        let weightCatId: number;
-
-        // Se presente weight_category nel CSV, cercala
-        if (athlete.weightCategory) {
-          const foundWeightCatId = await findWeightCategoryId(athlete.weightCategory, sex);
-          
-          if (foundWeightCatId) {
-            weightCatId = foundWeightCatId;
-          } else {
-            // Categoria non trovata, usa default e logga warning
-            weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
-            console.warn(`Athlete ${cf}: Weight category "${athlete.weightCategory}" not found, using default`);
+          if (!['M', 'F'].includes(sex)) {
+            results.failed++;
+            results.errors.push(`Athlete ${cf}: Invalid sex (must be M or F)`);
+            continue;
           }
-        } else {
-          // Nessuna categoria specificata, usa default
-          weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
-        }
+
+          // ============================================
+          // GESTIONE TEAM (usa cache)
+          // ============================================
+          let teamId: number | null = null;
+
+          if (team && team.trim()) {
+            if (teamMap.has(team.trim())) {
+              // Team exists in cache
+              teamId = teamMap.get(team.trim())!;
+            } else {
+              // Create new team
+              const { data: newTeam, error: teamError } = await supabaseAdmin
+                .from('teams')
+                .insert({ name: team.trim() })
+                .select('id')
+                .single();
+
+              if (teamError) {
+                console.warn(`Failed to create team "${team}": ${teamError.message}`);
+              } else {
+                teamId = newTeam.id;
+                teamMap.set(team.trim(), newTeam.id); // Add to cache
+              }
+            }
+          }
+
+          // ============================================
+          // GESTIONE ATLETA (usa cache + upsert)
+          // ============================================
+          let athleteId: number;
+
+          if (athleteMap.has(cf)) {
+            // Athlete exists in cache
+            athleteId = athleteMap.get(cf)!;
+          } else {
+            // Try to insert, if exists just get the id (UPSERT-like)
+            const { data: newAthlete, error: athleteError } = await supabaseAdmin
+              .from('athletes')
+              .upsert({
+                cf,
+                first_name: firstName,
+                last_name: lastName,
+                sex,
+                birth_date: birthDate
+              }, {
+                onConflict: 'cf',
+                ignoreDuplicates: false
+              })
+              .select('id')
+              .single();
+
+            if (athleteError || !newAthlete) {
+              results.failed++;
+              results.errors.push(`Athlete ${cf}: Failed to create - ${athleteError?.message || 'Unknown error'}`);
+              continue;
+            }
+
+            athleteId = newAthlete.id;
+            athleteMap.set(cf, newAthlete.id); // Add to cache
+          }
+
+          // Check if already registered for this meet (use cache)
+          if (registeredAthleteIds.has(athleteId)) {
+            results.failed++;
+            results.errors.push(`Athlete ${cf}: Already registered for this meet`);
+            continue;
+          }
+
+          // ============================================
+          // CALCOLA CATEGORIA PESO (usa cache)
+          // ============================================
+          let weightCatId: number;
+
+          // Se presente weight_category nel CSV, cercala nella cache
+          if (athlete.weightCategory) {
+            const weightCatMap = sex === 'M' ? weightCatMapM : weightCatMapF;
+            const foundWeightCatId = weightCatMap.get(athlete.weightCategory.trim());
+            
+            if (foundWeightCatId) {
+              weightCatId = foundWeightCatId;
+            } else {
+              // Categoria non trovata, usa default e logga warning
+              weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
+              console.warn(`Athlete ${cf}: Weight category "${athlete.weightCategory}" not found, using default`);
+            }
+          } else {
+            // Nessuna categoria specificata, usa default
+            weightCatId = sex === 'M' ? defaultWeightCatM.id : defaultWeightCatF.id;
+          }
 
         // ============================================
         // CALCOLA CATEGORIA ETÀ
@@ -529,7 +550,12 @@ export async function bulkCreateAthletes(req: AuthRequest, res: Response): Promi
         results.failed++;
         results.errors.push(`Athlete ${athlete.cf || 'unknown'}: ${err.message}`);
       }
-    }
+    } // Fine loop atleti
+
+    console.log(`✅ Batch ${batchIndex + 1}/${totalBatches} completed: ${results.success} success, ${results.failed} failed`);
+  } // Fine loop batch
+
+  console.log(`🎉 Bulk import completed: ${results.success}/${athletes.length} athletes imported`);
 
     return res.status(200).json({
       success: true,

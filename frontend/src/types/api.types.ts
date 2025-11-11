@@ -196,6 +196,66 @@ export interface BulkCreateAthletesResponse {
 }
 
 // ============================================
+// DIVISION API (Flights & Groups)
+// ============================================
+
+export interface DivisionAthlete {
+  form_id: number;
+  athlete_id: number;
+  first_name: string;
+  last_name: string;
+  sex: Sex;
+  weight_category: string;
+  flight_id?: number;
+  flight_name?: string;
+  group_id?: number;
+  group_name?: string;
+}
+
+export interface DivisionGroup {
+  id: number;
+  flight_id: number;
+  name: string;
+  ord: number;
+  athletes: DivisionAthlete[];
+}
+
+export interface DivisionFlight {
+  id: number;
+  meet_id: number;
+  name: string;
+  ord: number;
+  day_number: number;
+  start_time: string;
+  groups: DivisionGroup[];
+}
+
+export interface CreateDivisionResponse {
+  success: boolean;
+  division?: {
+    flights: number;
+    groups: number;
+    athletes: number;
+  };
+  message?: string;
+}
+
+export interface GetDivisionResponse {
+  success: boolean;
+  flights?: DivisionFlight[];
+  message?: string;
+}
+
+export interface SaveDivisionRequest {
+  flights: DivisionFlight[];
+}
+
+export interface SaveDivisionResponse {
+  success: boolean;
+  message?: string;
+}
+
+// ============================================
 // LIFTS & ATTEMPTS
 // ============================================
 

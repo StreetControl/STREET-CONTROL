@@ -187,50 +187,77 @@ ${exampleRow2Values.join(',')}`;
       const headerLine = lines[0];
       const headers = headerLine.split(',').map(h => h.trim());
       
-      const dataLines = lines.slice(1);
+      console.log('📋 CSV Headers detected:', headers);
       
-      const parsedAthletes = dataLines.map(line => {
-        const parts = line.split(',').map(s => s.trim());
-        
-        // Create object mapping header → value
-        const rowData: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          rowData[header] = parts[index] || '';
-        });
+      const dataLines = lines.slice(1);
+      console.log(`📊 Total data lines to process: ${dataLines.length}`);
+      
+      const parsedAthletes = dataLines.map((line, index) => {
+        try {
+          const parts = line.split(',').map(s => s.trim());
+          
+          // Create object mapping header → value
+          const rowData: Record<string, string> = {};
+          headers.forEach((header, idx) => {
+            rowData[header] = parts[idx] || '';
+          });
 
-        // Extract values using header names (case-insensitive)
-        const getVal = (key: string) => rowData[key] || rowData[key.toLowerCase()] || '';
+          // Extract values using header names (case-insensitive)
+          const getVal = (key: string) => rowData[key] || rowData[key.toLowerCase()] || '';
 
-        return { 
-          cf: getVal('cf'),
-          firstName: getVal('first_name'),
-          lastName: getVal('last_name'),
-          sex: getVal('sex') as 'M' | 'F',
-          birthDate: getVal('birth_date'),
-          weightCategory: getVal('weight_category') || undefined,
-          team: getVal('team') || undefined,
-          // Parse lift maxes from correct columns
-          maxMu: getVal('max_mu') ? parseFloat(getVal('max_mu')) : undefined,
-          maxPu: getVal('max_pu') ? parseFloat(getVal('max_pu')) : undefined,
-          maxDip: getVal('max_dip') ? parseFloat(getVal('max_dip')) : undefined,
-          maxSq: getVal('max_sq') ? parseFloat(getVal('max_sq')) : undefined,
-          maxMp: getVal('max_mp') ? parseFloat(getVal('max_mp')) : undefined
-        };
+          const athlete = { 
+            cf: getVal('cf'),
+            firstName: getVal('first_name'),
+            lastName: getVal('last_name'),
+            sex: getVal('sex') as 'M' | 'F',
+            birthDate: getVal('birth_date'),
+            weightCategory: getVal('weight_category') || undefined,
+            team: getVal('team') || undefined,
+            // Parse lift maxes from correct columns
+            maxMu: getVal('max_mu') ? parseFloat(getVal('max_mu')) : undefined,
+            maxPu: getVal('max_pu') ? parseFloat(getVal('max_pu')) : undefined,
+            maxDip: getVal('max_dip') ? parseFloat(getVal('max_dip')) : undefined,
+            maxSq: getVal('max_sq') ? parseFloat(getVal('max_sq')) : undefined,
+            maxMp: getVal('max_mp') ? parseFloat(getVal('max_mp')) : undefined
+          };
+
+          // Validation
+          if (!athlete.cf || !athlete.firstName || !athlete.lastName || !athlete.sex || !athlete.birthDate) {
+            throw new Error(`Riga ${index + 2}: campi obbligatori mancanti (cf, nome, cognome, sesso, data nascita)`);
+          }
+
+          return athlete;
+        } catch (rowError: any) {
+          console.error(`❌ Error parsing row ${index + 2}:`, line);
+          throw new Error(`Errore alla riga ${index + 2}: ${rowError.message}`);
+        }
       });
+
+      console.log(`📤 Sending ${parsedAthletes.length} athletes to backend...`);
 
       const response = await bulkImportAthletes(parseInt(meetId), {
         athletes: parsedAthletes
       });
 
+      console.log('📥 Backend response:', response);
+
       if (response.success) {
-        setSuccessMessage(response.message || 'Import completato con successo');
+        const { results } = response;
+        if (results && results.failed > 0) {
+          // Partial success
+          setSuccessMessage(`Import completato: ${results.success} atleti importati, ${results.failed} falliti`);
+          setError(`Errori: ${results.errors.slice(0, 5).join('; ')}${results.errors.length > 5 ? '...' : ''}`);
+        } else {
+          setSuccessMessage(response.message || 'Import completato con successo');
+        }
         await loadAthletes();
       } else {
         setError(response.message || 'Errore durante l\'import');
       }
 
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Errore durante la lettura del file CSV');
+      console.error('❌ Import error:', err);
+      setError(err.response?.data?.error || err.message || 'Errore durante la lettura del file CSV');
     } finally {
       setIsLoading(false);
       if (fileInputRef.current) {
@@ -300,6 +327,29 @@ ${exampleRow2Values.join(',')}`;
         </div>
       )}
 
+      {/* Loading Overlay with Spinner */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-dark-bg-secondary border-2 border-primary rounded-lg p-8 flex flex-col items-center gap-4">
+            {/* Spinning Loader */}
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-4 border-primary/30 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-primary rounded-full animate-spin"></div>
+            </div>
+            
+            {/* Loading Text */}
+            <div className="text-center">
+              <p className="text-lg font-semibold text-dark-text mb-1">
+                Importazione in corso...
+              </p>
+              <p className="text-sm text-dark-text-secondary">
+                Attendere, potrebbe volerci qualche minuto.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         {/* Download Template */}
@@ -321,12 +371,24 @@ ${exampleRow2Values.join(',')}`;
           disabled={isLoading || !meetId}
           className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg p-6 transition-colors"
         >
-          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <span className="text-lg font-semibold text-white">
-            {isLoading ? 'Caricamento...' : 'Importa dati atleti CSV'}
-          </span>
+          {isLoading ? (
+            <>
+              {/* Small spinner in button */}
+              <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <span className="text-lg font-semibold text-white">
+                Caricamento...
+              </span>
+            </>
+          ) : (
+            <>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="text-lg font-semibold text-white">
+                Importa dati atleti CSV
+              </span>
+            </>
+          )}
         </button>
 
         <input
