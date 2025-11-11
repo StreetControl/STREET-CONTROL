@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createMeet } from '../../services/api';
+import { createMeet, updateMeet } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { MEET_LEVELS, REGULATION_CODES, SCORE_TYPES } from '../../config/meetConfig';
 import type { CreateMeetRequest } from '../../types';
@@ -36,6 +36,8 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
   const [loadingMeet, setLoadingMeet] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMeetTypes = async () => {
@@ -125,6 +127,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setIsSubmitting(true);
 
     try {
@@ -133,29 +136,55 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
         throw new Error('Tutti i campi sono obbligatori');
       }
 
-      const meetRequest: CreateMeetRequest = {
-        name: formData.competition_name,
-        meet_type_id: formData.competition_type,
-        start_date: formData.start_date,
-        level: formData.level as 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE',
-        regulation_code: formData.regulation_code,
-        score_type: formData.score_type
-      };
+      if (existingMeetId && isEditMode) {
+        // UPDATE MODE
+        const updateRequest = {
+          name: formData.competition_name,
+          start_date: formData.start_date,
+          level: formData.level as 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE',
+          regulation_code: formData.regulation_code,
+          score_type: formData.score_type
+        };
 
-      const response = await createMeet(meetRequest);
+        const response = await updateMeet(parseInt(existingMeetId), updateRequest);
 
-      if (response.success && response.meet) {
-        if (onMeetCreated) {
-          onMeetCreated(response.meet.id);
+        if (response.success) {
+          setSuccessMessage('Gara aggiornata con successo!');
+          setIsEditMode(false);
+          // Reload data to ensure consistency
+          await loadExistingMeet();
         } else {
-          navigate('/meets');
+          throw new Error(response.message || 'Errore durante l\'aggiornamento della gara');
         }
+
       } else {
-        throw new Error(response.message || 'Errore durante la creazione della gara');
+        // CREATE MODE
+        const meetRequest: CreateMeetRequest = {
+          name: formData.competition_name,
+          meet_type_id: formData.competition_type,
+          start_date: formData.start_date,
+          level: formData.level as 'REGIONALE' | 'NAZIONALE' | 'INTERNAZIONALE',
+          regulation_code: formData.regulation_code,
+          score_type: formData.score_type
+        };
+
+        const response = await createMeet(meetRequest);
+
+        if (response.success && response.meet) {
+          if (onMeetCreated) {
+            onMeetCreated(response.meet.id);
+          } else {
+            navigate('/meets');
+          }
+        } else {
+          throw new Error(response.message || 'Errore durante la creazione della gara');
+        }
       }
 
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Errore durante la creazione della gara');
+      const errorMsg = err.response?.data?.error || err.message || 
+                       (existingMeetId ? 'Errore durante l\'aggiornamento della gara' : 'Errore durante la creazione della gara');
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -174,7 +203,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
     );
   }
 
-  const isReadOnly = !!existingMeetId;
+  const isReadOnly = !!existingMeetId && !isEditMode;
 
   return (
     <div className="card p-8">
@@ -182,16 +211,31 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
         {existingMeetId ? 'Informazioni Gara' : 'Informazioni Generali'}
       </h2>
 
-      {existingMeetId && (
+      {existingMeetId && !isEditMode && (
         <div className="mb-6 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-sm text-blue-400">
-              Le informazioni della gara non possono essere modificate dopo la creazione.
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-blue-400">
+                Le informazioni della gara sono in modalità sola lettura.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditMode(true)}
+              className="btn-secondary text-sm py-2 px-4 whitespace-nowrap"
+            >
+              ✏️ Modifica
+            </button>
           </div>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="mb-6 bg-green-900/20 border border-green-500/50 rounded-lg p-4">
+          <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
 
@@ -225,13 +269,13 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
           )}
         </div>
 
-        {/* Competition Type */}
+        {/* Competition Type - SEMPRE in sola lettura se esistingMeetId */}
         <div>
           <label className="label">
-            Tipo Competizione
+            Tipo Competizione {existingMeetId && <span className="text-xs text-dark-text-secondary">(non modificabile)</span>}
           </label>
-          {isReadOnly ? (
-            <div className="w-full bg-dark-bg border border-dark-border text-dark-text px-4 py-3 rounded-lg">
+          {existingMeetId ? (
+            <div className="w-full bg-dark-bg border border-dark-border text-dark-text-secondary px-4 py-3 rounded-lg opacity-60">
               {meetTypes.find(t => t.id === formData.competition_type)?.name || formData.competition_type}
             </div>
           ) : (
@@ -366,7 +410,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
           )}
         </div>
 
-        {/* Submit Buttons*/}
+        {/* Submit Buttons */}
         {!existingMeetId && (
           <div className="flex justify-between items-center pt-6 border-t border-dark-border">
             <button
@@ -384,6 +428,33 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
               className="btn-primary px-8"
             >
               {isSubmitting ? 'Creazione in corso...' : 'CREA GARA'}
+            </button>
+          </div>
+        )}
+
+        {/* Edit Mode Buttons */}
+        {existingMeetId && isEditMode && (
+          <div className="flex justify-between items-center pt-6 border-t border-dark-border">
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditMode(false);
+                setError(null);
+                setSuccessMessage(null);
+                loadExistingMeet(); // Ricarica i dati originali
+              }}
+              className="btn-secondary"
+              disabled={isSubmitting}
+            >
+              Annulla Modifiche
+            </button>
+            
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary px-8"
+            >
+              {isSubmitting ? 'Salvataggio in corso...' : '💾 SALVA MODIFICHE'}
             </button>
           </div>
         )}

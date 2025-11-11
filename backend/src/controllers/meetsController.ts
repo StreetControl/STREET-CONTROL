@@ -299,3 +299,152 @@ export async function createMeet(req: AuthRequest, res: Response): Promise<Respo
     });
   }
 }
+
+/**
+ * ============================================
+ * UPDATE MEET
+ * ============================================
+ * 
+ * Updates a meet's information (except meet_type_id which cannot be changed)
+ * PATCH /api/meets/:meetId
+ */
+export async function updateMeet(req: AuthRequest, res: Response): Promise<Response> {
+  try {
+    const authUser = req.user;
+
+    if (!authUser) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Unauthorized' 
+      });
+    }
+
+    const { meetId } = req.params;
+    const { name, start_date, level, regulation_code, score_type } = req.body;
+
+    // Validate required fields
+    if (!name || !start_date || !level || !regulation_code || !score_type) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'All fields are required' 
+      });
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(start_date)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid date format. Use YYYY-MM-DD' 
+      });
+    }
+
+    // Validate level
+    if (!['REGIONALE', 'NAZIONALE', 'INTERNAZIONALE'].includes(level)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid level. Must be REGIONALE, NAZIONALE or INTERNAZIONALE' 
+      });
+    }
+
+    // Validate score_type
+    if (!['IPF', 'RIS'].includes(score_type)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid score_type. Must be IPF or RIS' 
+      });
+    }
+
+    // Check if meet exists
+    const { data: existingMeet, error: fetchError } = await supabaseAdmin
+      .from('meets')
+      .select('id, federation_id')
+      .eq('id', meetId)
+      .single();
+
+    if (fetchError || !existingMeet) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Meet not found' 
+      });
+    }
+
+    // Verify user has access to this meet
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('auth_uid', authUser.auth_uid)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
+    }
+
+    const { data: userFederations, error: ufError } = await supabaseAdmin
+      .from('user_federations')
+      .select('federation_id')
+      .eq('user_id', user.id);
+
+    if (ufError) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch user federations' 
+      });
+    }
+
+    const federationIds = userFederations?.map(uf => uf.federation_id) || [];
+    
+    if (!federationIds.includes(existingMeet.federation_id)) {
+      return res.status(403).json({ 
+        success: false,
+        error: 'You do not have permission to update this meet' 
+      });
+    }
+
+    // Update meet (excluding meet_type_id)
+    const { data: updatedMeet, error: updateError } = await supabaseAdmin
+      .from('meets')
+      .update({
+        name,
+        start_date,
+        level,
+        regulation_code,
+        score_type
+      })
+      .eq('id', meetId)
+      .select(`
+        id,
+        federation_id,
+        meet_code,
+        name,
+        start_date,
+        level,
+        regulation_code,
+        meet_type_id,
+        score_type
+      `)
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to update meet' 
+      });
+    }
+
+    return res.json({
+      success: true,
+      meet: updatedMeet,
+      message: 'Meet updated successfully'
+    });
+
+  } catch (error) {
+    return res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+}

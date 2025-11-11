@@ -151,6 +151,14 @@ export async function createMeet(meetData: CreateMeetRequest): Promise<CreateMee
 }
 
 /**
+ * Update existing meet (all fields except meet_type_id)
+ */
+export async function updateMeet(meetId: number, meetData: Omit<CreateMeetRequest, 'meet_type_id'>): Promise<CreateMeetResponse> {
+  const response = await api.patch<CreateMeetResponse>(`/meets/${meetId}`, meetData);
+  return response.data;
+}
+
+/**
  * Get meet details
  */
 export async function getMeet(meetId: number): Promise<GetMeetResponse> {
