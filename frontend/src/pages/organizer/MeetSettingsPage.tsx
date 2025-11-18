@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
+import { ChevronLeft } from 'lucide-react';
 import {
   InfoTab,
   RegistrationTab,
@@ -77,8 +78,8 @@ export default function MeetSettingsPage() {
 
   return (
     <div className="min-h-screen bg-dark-bg">
-      {/* Header */}
-      <div className="bg-dark-bg-secondary border-b border-dark-border">
+      {/* Header - Fixed */}
+      <div className="fixed top-0 left-0 right-0 bg-dark-bg-secondary border-b border-dark-border z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -91,16 +92,17 @@ export default function MeetSettingsPage() {
             </div>
             <button
               onClick={() => navigate('/meets')}
-              className="btn-secondary"
+              className="btn-secondary inline-flex items-center gap-2"
             >
-              ← Torna alla lista
+              <ChevronLeft className="w-4 h-4 text-primary flex-shrink-0" />
+              Torna alla lista
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      {/* Tab Navigation - with top padding to account for fixed header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 pt-24">
         <div className="border-b border-dark-border">
           <nav className="-mb-px flex space-x-8">
             <TabButton

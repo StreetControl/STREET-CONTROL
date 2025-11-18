@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react';
 import { createDivision, getDivision, saveDivision, updateFlightsStructure, updateWeightCategory } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import type { DivisionFlight, DivisionAthlete } from '../../types';
-import { Users, Download, Save, ChevronRight } from 'lucide-react';
+import { Users, Download, Save, Settings, Calendar, Clock, Trash2, X, AlertTriangle } from 'lucide-react';
 import { generateNominationPDF } from './NominationPDF';
 
 interface GroupDivisionTabProps {
@@ -780,7 +780,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
 
       {/* Action Buttons */}
       <div className="card p-6">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-4 justify-between">
           {/* Create Division Button */}
           <button
             onClick={handleCreateDivision}
@@ -793,42 +793,37 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
             {isCreating ? 'Creazione in corso...' : 'CREA DIVISIONE FLIGHT E GRUPPI'}
           </button>
 
-          {/* Save Structure Button */}
-          {divisionExists && (
-            <button
-              onClick={handleSaveAthleteAssignments}
-              disabled={isSaving}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-bold text-lg transition-all flex items-center gap-3 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105"
-            >
-              <Save className="w-6 h-6" />
-              {isSaving ? '⏳ SALVATAGGIO IN CORSO...' : '💾 SALVA STRUTTURA'}
-            </button>
-          )}
+          {/* Right side buttons */}
+          <div className="flex gap-4">
+            {/* Save Structure Button */}
+            {divisionExists && (
+              <button
+                onClick={handleSaveAthleteAssignments}
+                disabled={isSaving}
+                className="bg-primary-dark hover:bg-primary text-white px-10 py-4 rounded-lg font-bold text-xl transition-colors flex items-center gap-3 disabled:opacity-50 shadow-xl border-2 border-primary/50 hover:border-primary"
+              >
+                <Save className="w-7 h-7" />
+                {isSaving ? 'SALVATAGGIO IN CORSO...' : 'SALVA STRUTTURA'}
+              </button>
+            )}
 
-          {/* Print Nomination Button */}
-          {divisionExists && (
-            <button
-              onClick={handleExportNomination}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
-            >
-              <Download className="w-5 h-5" />
-              🖨️ STAMPA NOMINATION
-            </button>
-          )}
-
-          {/* Next Button */}
-          <button
-            className="btn-secondary flex items-center gap-2 ml-auto"
-            onClick={() => {/* TODO: Navigate to next tab */}}
-          >
-            AVANTI
-            <ChevronRight className="w-5 h-5" />
-          </button>
+            {/* Print Nomination Button */}
+            {divisionExists && (
+              <button
+                onClick={handleExportNomination}
+                className="bg-dark-bg-tertiary hover:bg-dark-border text-dark-text border border-dark-border hover:border-primary px-6 py-4 rounded-lg font-semibold transition-colors flex items-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                STAMPA NOMINATION
+              </button>
+            )}
+          </div>
         </div>
 
         {!divisionExists && (
-          <p className="text-dark-text-secondary text-sm mt-4">
-            ⚠️ Crea prima la divisione automatica cliccando il pulsante rosso. Potrai poi modificarla manualmente.
+          <p className="text-dark-text-secondary text-base mt-4 flex items-center gap-2">
+            <AlertTriangle className="w-7 h-7" />
+            Crea prima la divisione automatica cliccando il pulsante, potrai poi modificarla manualmente.
           </p>
         )}
       </div>
@@ -839,27 +834,28 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
             {/* Summary Bar */}
             <div className="card p-4 bg-dark-bg-secondary">
               <div className="flex items-center justify-between">
-                <div className="grid grid-cols-3 gap-4 text-sm flex-1">
-                  <div className="flex items-center gap-2">
+                <div className="grid grid-cols-3 gap-6 text-base flex-1">
+                  <div className="flex items-center gap-3">
                     <span className="text-dark-text-secondary">Flight totali:</span>
-                    <span className="text-dark-text font-bold text-lg">{flights.length}</span>
+                    <span className="text-primary font-bold text-xl">{flights.length}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <span className="text-dark-text-secondary">Gruppi totali:</span>
-                    <span className="text-dark-text font-bold text-lg">
+                    <span className="text-primary font-bold text-xl">
                       {flights.reduce((sum, f) => sum + f.groups.length, 0)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <span className="text-dark-text-secondary">Atleti totali:</span>
-                    <span className="text-primary font-bold text-lg">{athletesWithLifts.length}</span>
+                    <span className="text-primary font-bold text-xl">{athletesWithLifts.length}</span>
                   </div>
                 </div>
                 <button
                   onClick={handleEditFlights}
-                  className="btn-secondary text-sm px-4 py-2"
+                  className="btn-secondary px-6 py-3 flex items-center gap-2"
                 >
-                  ⚙️ Gestisci Flight
+                  <Settings className="w-5 h-5" />
+                  Gestisci Flight
                 </button>
               </div>
             </div>
@@ -870,12 +866,12 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                 <div className="bg-dark-bg-secondary rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto">
                   {/* Header */}
                   <div className="sticky top-0 bg-dark-bg-secondary border-b border-dark-border px-6 py-4 flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-dark-text">Gestione Flight</h3>
+                    <h3 className="text-2xl font-bold text-dark-text">Gestione Flight</h3>
                     <button
                       onClick={handleCancelEditFlights}
                       className="text-dark-text-secondary hover:text-dark-text transition-colors"
                     >
-                      ✕
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
 
@@ -884,13 +880,14 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                     {editedFlights.map((flight, index) => (
                       <div key={flight.id} className="card p-4 bg-dark-bg space-y-3">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-dark-text">Flight {index + 1}</h4>
+                          <h4 className="font-bold text-lg text-primary">Flight {index + 1}</h4>
                           {editedFlights.length > 1 && (
                             <button
                               onClick={() => handleRemoveFlight(flight.id)}
-                              className="text-red-500 hover:text-red-400 text-sm"
+                              className="text-red-500 hover:text-red-400 flex items-center gap-1"
                             >
-                              🗑️ Elimina
+                              <Trash2 className="w-4 h-4" />
+                              <span>Elimina</span>
                             </button>
                           )}
                         </div>
@@ -898,23 +895,23 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {/* Nome */}
                           <div>
-                            <label className="block text-sm text-dark-text-secondary mb-1">Nome Flight</label>
+                            <label className="block text-base text-dark-text-secondary mb-1">Nome Flight</label>
                             <input
                               type="text"
                               value={flight.name}
                               onChange={(e) => handleUpdateFlight(flight.id, 'name', e.target.value)}
-                              className="w-full bg-dark-bg-secondary border border-dark-border rounded px-3 py-2 text-dark-text focus:border-primary focus:outline-none"
+                              className="w-full bg-dark-bg-secondary border border-dark-border rounded px-3 py-2.5 text-base text-dark-text focus:border-primary focus:outline-none"
                               placeholder="es. Flight A"
                             />
                           </div>
 
                           {/* Giorno */}
                           <div>
-                            <label className="block text-sm text-dark-text-secondary mb-1">Giorno</label>
+                            <label className="block text-base text-dark-text-secondary mb-1">Giorno</label>
                             <select
                               value={flight.day_number}
                               onChange={(e) => handleUpdateFlight(flight.id, 'day_number', parseInt(e.target.value))}
-                              className="w-full bg-dark-bg-secondary border border-dark-border rounded px-3 py-2 text-dark-text focus:border-primary focus:outline-none"
+                              className="w-full bg-dark-bg-secondary border border-dark-border rounded px-3 py-2.5 text-base text-dark-text focus:border-primary focus:outline-none"
                             >
                               {Array.from({ length: meetDays }, (_, i) => (
                                 <option key={i + 1} value={i + 1}>Giorno {i + 1}</option>
@@ -924,19 +921,20 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
 
                           {/* Orario */}
                           <div>
-                            <label className="block text-sm text-dark-text-secondary mb-1">Orario Inizio</label>
+                            <label className="block text-base text-dark-text-secondary mb-1">Orario Inizio</label>
                             <input
                               type="time"
                               value={flight.start_time || '09:00'}
                               onChange={(e) => handleUpdateFlight(flight.id, 'start_time', e.target.value)}
-                              className="w-full bg-dark-bg-secondary border border-dark-border rounded px-3 py-2 text-dark-text focus:border-primary focus:outline-none"
+                              className="w-full bg-dark-bg-secondary border border-dark-border rounded px-3 py-2.5 text-base text-dark-text focus:border-primary focus:outline-none"
                             />
                           </div>
 
                           {/* Info Atleti */}
-                          <div className="flex items-center">
-                            <span className="text-sm text-dark-text-secondary">
-                              👥 {flight.groups.reduce((sum, g) => sum + g.athletes.length, 0)} atleti in {flight.groups.length} gruppi
+                          <div className="flex items-center gap-2">
+                            <Users className="w-5 h-5 text-dark-text-secondary" />
+                            <span className="text-base text-dark-text-secondary">
+                              {flight.groups.reduce((sum, g) => sum + g.athletes.length, 0)} atleti in {flight.groups.length} gruppi
                             </span>
                           </div>
                         </div>
@@ -944,25 +942,25 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                         {/* Groups Management */}
                         <div className="mt-4 pt-4 border-t border-dark-border space-y-2">
                           <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-sm font-semibold text-dark-text-secondary">Gruppi</h5>
+                            <h5 className="text-base font-semibold text-dark-text-secondary">Gruppi</h5>
                             <button
                               onClick={() => handleAddGroup(flight.id)}
-                              className="text-xs text-primary hover:text-primary/80"
+                              className="text-sm text-primary hover:text-primary/80"
                             >
                               + Aggiungi Gruppo
                             </button>
                           </div>
 
                           {flight.groups.map((group, gIndex) => (
-                            <div key={group.id} className="flex items-center gap-2 bg-dark-bg-secondary/50 rounded p-2">
-                              <span className="text-xs text-dark-text-secondary w-6">{gIndex + 1}.</span>
+                            <div key={group.id} className="flex items-center gap-2 bg-dark-bg-secondary/50 rounded p-2.5">
+                              <span className="text-sm text-dark-text-secondary w-8">{gIndex + 1}.</span>
                               
                               {/* Group Name */}
                               <input
                                 type="text"
                                 value={group.name}
                                 onChange={(e) => handleUpdateGroupName(flight.id, group.id, e.target.value)}
-                                className="flex-1 bg-dark-bg border border-dark-border rounded px-2 py-1 text-sm text-dark-text focus:border-primary focus:outline-none"
+                                className="flex-1 bg-dark-bg border border-dark-border rounded px-3 py-1.5 text-sm text-dark-text focus:border-primary focus:outline-none"
                                 placeholder="Nome gruppo"
                               />
 
@@ -970,7 +968,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                               <select
                                 value={flight.id}
                                 onChange={(e) => handleMoveGroup(group.id, flight.id, parseInt(e.target.value))}
-                                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text focus:border-primary focus:outline-none"
+                                className="bg-dark-bg border border-dark-border rounded px-2 py-1.5 text-sm text-dark-text focus:border-primary focus:outline-none"
                               >
                                 {editedFlights.map(f => (
                                   <option key={f.id} value={f.id}>{f.name}</option>
@@ -978,17 +976,18 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                               </select>
 
                               {/* Athletes Count */}
-                              <span className="text-xs text-dark-text-secondary whitespace-nowrap">
-                                {group.athletes.length} 👤
+                              <span className="flex items-center gap-1 text-sm text-dark-text-secondary whitespace-nowrap">
+                                <Users className="w-4 h-4" />
+                                {group.athletes.length}
                               </span>
 
                               {/* Delete Group */}
                               {flight.groups.length > 1 && (
                                 <button
                                   onClick={() => handleRemoveGroup(flight.id, group.id)}
-                                  className="text-red-500 hover:text-red-400 text-xs"
+                                  className="text-red-500 hover:text-red-400"
                                 >
-                                  🗑️
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
                             </div>
@@ -1017,10 +1016,11 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                     </button>
                     <button
                       onClick={handleSaveFlights}
-                      className="btn-primary"
+                      className="bg-primary-dark hover:bg-primary text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
                       disabled={isSaving}
                     >
-                      {isSaving ? '⏳ Salvataggio...' : '💾 Salva Modifiche'}
+                      <Save className="w-5 h-5" />
+                      {isSaving ? 'Salvataggio...' : 'Salva Modifiche'}
                     </button>
                   </div>
                 </div>
@@ -1037,11 +1037,11 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <h3 className="text-xl font-bold text-primary">{flight.name}</h3>
+                      <h3 className="text-xl font-bold text-primary">{flight.name}:</h3>
                       <div className="flex items-center gap-4 text-sm text-dark-text-secondary">
-                        <span>📅 Giorno {flight.day_number}</span>
-                        <span>🕐 {flight.start_time}</span>
-                        <span>👥 {flight.groups.reduce((sum, g) => sum + (g.athletes?.length || 0), 0)} atleti</span>
+                        <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> Giorno {flight.day_number}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {flight.start_time}</span>
+                        <span className="flex items-center gap-1"><Users className="w-4 h-4" /> {flight.groups.reduce((sum, g) => sum + (g.athletes?.length || 0), 0)} atleti</span>
                       </div>
                     </div>
                     <button className="text-dark-text-secondary hover:text-dark-text">
@@ -1061,10 +1061,10 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                       return (
                         <div key={group.id} className="border border-dark-border rounded-lg overflow-hidden">
                           {/* Group Header */}
-                          <div className="bg-dark-bg-secondary px-4 py-3 border-b border-dark-border">
+                          <div className="bg-primary/10 px-4 py-3 border-b border-primary/30">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-semibold text-dark-text">{group.name}</h4>
-                              <span className="text-sm text-dark-text-secondary">
+                              <h4 className="font-semibold text-primary">{group.name}</h4>
+                              <span className="text-sm text-primary/80">
                                 {groupAthletes.length} atleti
                               </span>
                             </div>

@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { createMeet, updateMeet } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { MEET_LEVELS, REGULATION_CODES, SCORE_TYPES } from '../../config/meetConfig';
+import { Edit } from 'lucide-react';
 import type { CreateMeetRequest } from '../../types';
 
 interface MeetType {
@@ -215,7 +216,7 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
   return (
     <div className="card p-8">
       <h2 className="text-2xl font-bold text-dark-text mb-6">
-        {existingMeetId ? 'Informazioni Gara' : 'Informazioni Generali'}
+        {existingMeetId ? 'INFORMAZIONI GARA' : 'INFORMAZIONI GENERALI'}
       </h2>
 
       {existingMeetId && !isEditMode && (
@@ -232,9 +233,10 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
             <button
               type="button"
               onClick={() => setIsEditMode(true)}
-              className="btn-secondary text-sm py-2 px-4 whitespace-nowrap"
+              className="btn-secondary text-sm py-2 px-4 whitespace-nowrap flex items-center gap-2"
             >
-              ✏️ Modifica
+              <Edit className="w-4 h-4" />
+              Modifica
             </button>
           </div>
         </div>

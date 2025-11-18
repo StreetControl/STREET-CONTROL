@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMeets } from '../services/api';
-import { Calendar, LogOut, Plus, Flag } from 'lucide-react';
+import { Calendar, LogOut, Plus, Flag, ChevronRight } from 'lucide-react';
 import type { Meet } from '../types';
 
 const MeetListPage = () => {
@@ -20,9 +20,14 @@ const MeetListPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
 
-  // Separate meets by status
-  const pastMeets = meets.filter(m => m.status === 'COMPLETED');
-  const activeMeets = meets.filter(m => m.status === 'IN_PROGRESS' || m.status === 'SETUP');
+  // Separate meets by status and sort by date (ascending - earliest first)
+  const pastMeets = meets
+    .filter(m => m.status === 'COMPLETED')
+    .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+  
+  const activeMeets = meets
+    .filter(m => m.status === 'IN_PROGRESS' || m.status === 'SETUP')
+    .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
 
   // Check if user is Organizer
   const isOrganizer = activeRole?.role === 'ORGANIZER';
@@ -82,8 +87,8 @@ const MeetListPage = () => {
 
   return (
     <div className="min-h-screen bg-dark-bg">
-      {/* Header */}
-      <header className="bg-dark-bg-secondary border-b border-dark-border">
+      {/* Header - Fixed */}
+      <header className="fixed top-0 left-0 right-0 bg-dark-bg-secondary border-b border-dark-border z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-primary/20 border border-primary/30 rounded-lg flex items-center justify-center">
@@ -106,8 +111,8 @@ const MeetListPage = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Main Content - with top padding to account for fixed header */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-28">
         {/* Error Message */}
         {error && (
           <div className="error-message mb-6">
@@ -125,103 +130,9 @@ const MeetListPage = () => {
           </div>
         ) : (
           <>
-            {/* Past Meets Section */}
-            <section className="mb-12">
-              <h2 className="text-2xl font-bold text-dark-text mb-6">
-                • Lista gare passate <span className="text-primary">{user?.name}</span>:
-              </h2>
-              
-              {pastMeets.length === 0 ? (
-                <div className="card p-8 text-center">
-                  <p className="text-dark-text-secondary">Nessuna gara passata</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pastMeets.map((meet) => (
-                    <button
-                      key={meet.id}
-                      onClick={() => handleMeetClick(meet.id)}
-                      className="w-full card p-6 hover:bg-dark-bg-tertiary transition-colors group text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-dark-text group-hover:text-primary transition-colors">
-                            {meet.name}
-                          </h3>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-sm text-dark-text-secondary flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {formatDate(meet.start_date)}
-                            </span>
-                            <span className="text-sm text-dark-text-muted">
-                              {meet.level}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-dark-text-muted group-hover:text-primary transition-colors">
-                          →
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Active Meets Section */}
-            <section className="mb-12">
-              <h2 className="text-2xl font-bold text-dark-text mb-6">
-                • Lista gare attive <span className="text-primary">{user?.name}</span>:
-              </h2>
-              
-              {activeMeets.length === 0 ? (
-                <div className="card p-8 text-center">
-                  <p className="text-dark-text-secondary">Nessuna gara attiva</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {activeMeets.map((meet) => (
-                    <button
-                      key={meet.id}
-                      onClick={() => handleMeetClick(meet.id)}
-                      className="w-full card p-6 hover:bg-dark-bg-tertiary transition-colors group text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="text-lg font-semibold text-dark-text group-hover:text-primary transition-colors">
-                              {meet.name}
-                            </h3>
-                            {meet.status === 'IN_PROGRESS' && (
-                              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-medium">
-                                <Flag className="w-3 h-3" />
-                                "attiva è"
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-sm text-dark-text-secondary flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {formatDate(meet.start_date)}
-                            </span>
-                            <span className="text-sm text-dark-text-muted">
-                              {meet.level}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-dark-text-muted group-hover:text-primary transition-colors">
-                          →
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-
             {/* Create New Meet Button - ONLY for ORGANIZER */}
             {isOrganizer && (
-              <section>
+              <section className="mb-8">
                 <button
                   onClick={handleCreateMeet}
                   className="w-full card p-8 hover:bg-primary/5 border-2 border-primary/30 hover:border-primary transition-all group"
@@ -232,16 +143,112 @@ const MeetListPage = () => {
                         <Plus className="w-6 h-6 text-primary" />
                       </div>
                       <h3 className="text-xl font-bold text-primary">
-                        • CREA UNA NUOVA GARA
+                        CREA UNA NUOVA GARA
                       </h3>
-                    </div>
-                    <div className="text-primary group-hover:translate-x-2 transition-transform">
-                      →
                     </div>
                   </div>
                 </button>
               </section>
             )}
+
+            {/* Two Column Layout: Past Meets (left) and Active Meets (right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+              {/* Past Meets Section - Left Column */}
+              <section className="flex flex-col lg:pr-4 lg:border-r lg:border-dark-border">
+                <h2 className="text-2xl font-bold text-primary mb-6 underline decoration-2 underline-offset-4">
+                  GARE PASSATE
+                </h2>
+                
+                {/* Container with fixed min-height */}
+                <div className="card p-6 flex-1 min-h-[400px]">
+                  {pastMeets.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-dark-text-secondary">Nessuna gara passata</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {pastMeets.map((meet) => (
+                        <button
+                          key={meet.id}
+                          onClick={() => handleMeetClick(meet.id)}
+                          className="w-full bg-dark-bg-tertiary hover:bg-dark-bg border border-dark-border hover:border-primary rounded-lg p-6 transition-colors group text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-semibold text-dark-text group-hover:text-primary transition-colors">
+                                {meet.name}
+                              </h3>
+                              <div className="flex items-center gap-4 mt-2">
+                                <span className="text-sm text-dark-text-secondary flex items-center gap-2">
+                                  <Calendar className="w-4 h-4" />
+                                  {formatDate(meet.start_date)}
+                                </span>
+                                <span className="text-sm text-dark-text-muted">
+                                  {meet.level}
+                                </span>
+                              </div>
+                            </div>
+                            <ChevronRight className="w-6 h-6 text-primary group-hover:brightness-125 transition-all" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Active Meets Section - Right Column */}
+              <section className="flex flex-col lg:pl-4 mt-8 lg:mt-0">
+                <h2 className="text-2xl font-bold text-primary mb-6 underline decoration-2 underline-offset-4">
+                  GARE ATTIVE
+                </h2>
+                
+                {/* Container with fixed min-height */}
+                <div className="card p-6 flex-1 min-h-[400px]">
+                  {activeMeets.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-dark-text-secondary">Nessuna gara attiva</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {activeMeets.map((meet) => (
+                        <button
+                          key={meet.id}
+                          onClick={() => handleMeetClick(meet.id)}
+                          className="w-full bg-dark-bg-tertiary hover:bg-dark-bg border border-dark-border hover:border-primary rounded-lg p-6 transition-colors group text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <h3 className="text-lg font-semibold text-dark-text group-hover:text-primary transition-colors">
+                                  {meet.name}
+                                </h3>
+                                {meet.status === 'IN_PROGRESS' && (
+                                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-medium">
+                                    <Flag className="w-3 h-3" />
+                                    "attiva è"
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4 mt-2">
+                                <span className="text-sm text-dark-text-secondary flex items-center gap-2">
+                                  <Calendar className="w-4 h-4" />
+                                  {formatDate(meet.start_date)}
+                                </span>
+                                <span className="text-sm text-dark-text-muted">
+                                  {meet.level}
+                                </span>
+                              </div>
+                            </div>
+                            <ChevronRight className="w-6 h-6 text-primary group-hover:brightness-125 transition-all" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
           </>
         )}
       </main>

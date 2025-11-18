@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getMeetAthletes, bulkImportAthletes, deleteAthleteFromMeet } from '../../services/api';
 import { supabase } from '../../services/supabase';
 
@@ -22,7 +21,6 @@ interface RegistrationTabProps {
 }
 
 export default function RegistrationTab({ meetId }: RegistrationTabProps) {
-  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [athletes, setAthletes] = useState<AthleteRow[]>([]);
@@ -294,17 +292,11 @@ ${exampleRow2Values.join(',')}`;
 
   return (
     <div className="card p-8">
-      {/* Header with AVANTI button */}
-      <div className="flex justify-between items-center mb-6">
+      {/* Header */}
+      <div className="mb-6">
         <h2 className="text-2xl font-bold text-dark-text">
           Importa Atleti
         </h2>
-        <button
-          onClick={() => navigate('/meets')}
-          className="btn-primary px-6"
-        >
-          AVANTI
-        </button>
       </div>
 
       {/* Error/Success Messages */}
@@ -362,7 +354,7 @@ ${exampleRow2Values.join(',')}`;
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isLoading || !meetId}
-          className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg p-6 transition-colors"
+          className="flex items-center justify-center gap-2 bg-primary-dark hover:bg-primary rounded-lg p-6 transition-colors font-semibold text-white disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
             <>
@@ -396,9 +388,14 @@ ${exampleRow2Values.join(',')}`;
       {/* Athletes List */}
       {athletes.length > 0 && (
         <div className="mt-8">
-          <h3 className="text-xl font-bold text-dark-text mb-4">
-            LISTA ATLETI REGISTRATI:
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-dark-text">
+              LISTA ATLETI REGISTRATI:
+            </h3>
+            <p className="text-sm text-dark-text-secondary">
+              Totale atleti registrati: <span className="font-semibold text-primary">{athletes.length}</span>
+            </p>
+          </div>
           
           <div className="bg-dark-bg-secondary border border-dark-border rounded-lg overflow-hidden">
             <table className="w-full">
@@ -455,10 +452,6 @@ ${exampleRow2Values.join(',')}`;
               </tbody>
             </table>
           </div>
-
-          <p className="mt-4 text-sm text-dark-text-secondary">
-            Totale atleti registrati: <span className="font-semibold text-primary">{athletes.length}</span>
-          </p>
         </div>
       )}
 

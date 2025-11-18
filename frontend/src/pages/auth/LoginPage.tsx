@@ -51,35 +51,22 @@ const LoginPage = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Logo + Title */}
         <div className="text-center mb-8">
-          {/* Logo with edge glow effects */}
-          <div className="relative inline-block mb-6 group">
+          {/* Logo with subtle glow */}
+          <div className="relative inline-block mb-6">
             <img 
               src="/src/assets/images/streetControlLogo.svg" 
               alt="Street Control Logo" 
-              className="w-40 h-40 relative z-10
-                         drop-shadow-[0_0_20px_rgba(167,139,250,0.4)]
-                         group-hover:drop-shadow-[0_0_30px_rgba(167,139,250,0.7)]
-                         transition-all duration-500
-                         filter group-hover:brightness-110"
+              className="w-40 h-40 drop-shadow-[0_0_8px_rgba(167,139,250,0.25)]"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.onerror = null;
                 target.src = '/src/assets/images/streetControlLogo.png';
               }}
             />
-            {/* Animated border glow */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse"></div>
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-              <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-transparent via-primary to-transparent animate-pulse" style={{ animationDelay: '0.25s' }}></div>
-              <div className="absolute right-0 top-0 w-1 h-full bg-gradient-to-b from-transparent via-blue-500 to-transparent animate-pulse" style={{ animationDelay: '0.75s' }}></div>
-            </div>
           </div>
 
-          {/* Title with custom font */}
-          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary
-                         tracking-wider animate-gradient font-display
-                         drop-shadow-[0_0_15px_rgba(167,139,250,0.3)]">
+          {/* Title */}
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-primary tracking-wider font-display">
             STREET CONTROL
           </h1>
         </div>
