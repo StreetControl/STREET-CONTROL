@@ -755,7 +755,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
         <div className="flex justify-center items-center py-12">
           <div className="text-center">
             <div className="inline-block w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
-            <p className="text-dark-text-secondary">Caricamento divisione...</p>
+            <p className="text-dark-text-secondary">...Caricamento...</p>
           </div>
         </div>
       </div>
