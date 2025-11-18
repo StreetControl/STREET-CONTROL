@@ -302,6 +302,14 @@ export async function saveDivision(meetId: number, data: SaveDivisionRequest): P
   return response.data;
 }
 
+export async function updateWeightCategory(meetId: number, formId: number, weightCatId: number): Promise<{ success: boolean; message: string }> {
+  const response = await api.patch<{ success: boolean; message: string }>(`/meets/${meetId}/division/weight-category`, {
+    formId,
+    weightCatId
+  });
+  return response.data;
+}
+
 // ============================================
 // EXPORT DEFAULT
 // ============================================

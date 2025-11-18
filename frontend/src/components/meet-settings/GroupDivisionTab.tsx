@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { createDivision, getDivision, saveDivision, updateFlightsStructure } from '../../services/api';
+import { createDivision, getDivision, saveDivision, updateFlightsStructure, updateWeightCategory } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import type { DivisionFlight, DivisionAthlete } from '../../types';
 import { Users, Download, Save, ChevronRight } from 'lucide-react';
@@ -23,6 +23,15 @@ interface GroupDivisionTabProps {
 interface AthleteWithLifts extends DivisionAthlete {
   lifts: { lift_id: string; declared_max_kg: number }[];
   total_kg?: number;
+  weight_cat_id?: number;
+}
+
+// Weight category interface
+interface WeightCategory {
+  id: number;
+  name: string;
+  sex: string;
+  ord: number;
 }
 
 // Athlete Row Component
@@ -30,11 +39,16 @@ interface AthleteRowProps {
   athlete: AthleteWithLifts;
   index: number;
   flights: DivisionFlight[];
+  weightCategories: WeightCategory[];
   onGroupChange: (athleteId: number, newGroupId: number) => void;
+  onWeightCategoryChange: (formId: number, newWeightCatId: number) => void;
 }
 
-function AthleteRow({ athlete, index, flights, onGroupChange }: AthleteRowProps) {
+function AthleteRow({ athlete, index, flights, weightCategories, onGroupChange, onWeightCategoryChange }: AthleteRowProps) {
   const bgColor = index % 2 === 0 ? 'bg-dark-bg' : 'bg-dark-bg-secondary/30';
+
+  // Filter weight categories by athlete's sex
+  const availableCategories = weightCategories.filter(cat => cat.sex === athlete.sex);
 
   return (
     <tr className={`border-b border-dark-border/50 hover:bg-dark-bg-secondary transition-colors ${bgColor}`}>
@@ -53,8 +67,18 @@ function AthleteRow({ athlete, index, flights, onGroupChange }: AthleteRowProps)
         </span>
       </td>
 
-      {/* Categoria Peso */}
-      <td className="py-3 px-3 text-dark-text">{athlete.weight_category}</td>
+      {/* Categoria Peso - Now editable */}
+      <td className="py-3 px-3">
+        <select
+          value={athlete.weight_cat_id || ''}
+          onChange={(e) => onWeightCategoryChange(athlete.form_id, parseInt(e.target.value))}
+          className="bg-dark-bg-secondary border border-dark-border rounded px-2 py-1 text-sm text-dark-text hover:border-primary focus:border-primary focus:outline-none transition-colors"
+        >
+          {availableCategories.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
+      </td>
 
       {/* Totale Provvisorio */}
       <td className="py-3 px-3 text-primary font-bold">
@@ -84,6 +108,7 @@ function AthleteRow({ athlete, index, flights, onGroupChange }: AthleteRowProps)
 export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
   const [flights, setFlights] = useState<DivisionFlight[]>([]);
   const [athletesWithLifts, setAthletesWithLifts] = useState<AthleteWithLifts[]>([]);
+  const [weightCategories, setWeightCategories] = useState<WeightCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,8 +126,23 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     if (meetId) {
       loadMeetInfo();
       loadDivision();
+      loadWeightCategories();
     }
   }, [meetId]);
+
+  const loadWeightCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('weight_categories_std')
+        .select('id, name, sex, ord')
+        .order('ord', { ascending: true });
+      
+      if (error) throw error;
+      setWeightCategories(data || []);
+    } catch (err) {
+      console.error('Error loading weight categories:', err);
+    }
+  };
 
   const loadMeetInfo = async () => {
     if (!meetId) return;
@@ -187,6 +227,21 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
       return;
     }
 
+    // Load weight_cat_id from form_info
+    const { data: formInfos, error: formInfoError } = await supabase
+      .from('form_info')
+      .select('id, weight_cat_id')
+      .in('id', formIds);
+
+    if (formInfoError) {
+      console.error('Error loading form_info:', formInfoError);
+    }
+
+    const weightCatMap = new Map<number, number>();
+    (formInfos || []).forEach(info => {
+      weightCatMap.set(info.id, info.weight_cat_id);
+    });
+
     // Create map: form_id -> lifts[]
     const liftsMap = new Map<number, { lift_id: string; declared_max_kg: number }[]>();
     (lifts || []).forEach(lift => {
@@ -214,7 +269,8 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
             group_id: group.id,
             group_name: group.name,
             lifts: athleteLifts,
-            total_kg: total
+            total_kg: total,
+            weight_cat_id: weightCatMap.get(athlete.form_id)
           });
         });
       });
@@ -428,6 +484,47 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     if (!targetFlightId) return;
     
     moveAthleteToGroup(athleteId, targetFlightId, newGroupId);
+  };
+
+  // Handle weight category change
+  const handleWeightCategoryChange = async (formId: number, newWeightCatId: number) => {
+    if (!meetId) return;
+
+    try {
+      // Update in database via API
+      await updateWeightCategory(parseInt(meetId), formId, newWeightCatId);
+
+      // Update local state
+      const newCategory = weightCategories.find(cat => cat.id === newWeightCatId);
+      setAthletesWithLifts(prev =>
+        prev.map(athlete =>
+          athlete.form_id === formId
+            ? { ...athlete, weight_cat_id: newWeightCatId, weight_category: newCategory?.name || '' }
+            : athlete
+        )
+      );
+
+      // Update flights state
+      setFlights(prev => {
+        const updated = JSON.parse(JSON.stringify(prev)) as DivisionFlight[];
+        updated.forEach(flight => {
+          flight.groups.forEach(group => {
+            const athlete = group.athletes?.find(a => a.form_id === formId);
+            if (athlete) {
+              athlete.weight_category = newCategory?.name || '';
+            }
+          });
+        });
+        return updated;
+      });
+
+      setSuccessMessage('Categoria peso modificata con successo');
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err: any) {
+      console.error('Error updating weight category:', err);
+      setError('Errore durante la modifica della categoria peso');
+      setTimeout(() => setError(null), 3000);
+    }
   };
 
   // Toggle flight expansion
@@ -993,7 +1090,9 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
                                       athlete={athlete}
                                       index={index}
                                       flights={flights}
+                                      weightCategories={weightCategories}
                                       onGroupChange={handleGroupChange}
+                                      onWeightCategoryChange={handleWeightCategoryChange}
                                     />
                                   ))}
                                 </tbody>
