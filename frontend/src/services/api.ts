@@ -287,6 +287,14 @@ export async function getDivision(meetId: number): Promise<GetDivisionResponse> 
 }
 
 /**
+ * Update flights structure (name, day, time, groups)
+ */
+export async function updateFlightsStructure(meetId: number, flights: any[]): Promise<any> {
+  const response = await api.put(`/meets/${meetId}/division/flights`, { flights });
+  return response.data;
+}
+
+/**
  * Save modified division structure (after drag & drop)
  */
 export async function saveDivision(meetId: number, data: SaveDivisionRequest): Promise<SaveDivisionResponse> {

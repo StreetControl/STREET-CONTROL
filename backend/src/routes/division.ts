@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { createDivision, getDivision, saveDivision } from '../controllers/divisionController.js';
+import { createDivision, getDivision, saveDivision, updateFlightsStructure } from '../controllers/divisionController.js';
 import { verifyToken } from '../middleware/verifyToken.js';
 
 const router = Router();
@@ -24,6 +24,12 @@ router.post('/:meetId/division/create', verifyToken, createDivision);
  * Returns current division structure
  */
 router.get('/:meetId/division', verifyToken, getDivision);
+
+/**
+ * PUT /api/meets/:meetId/division/flights
+ * Updates flight structure (name, day, time, groups) without affecting athlete assignments
+ */
+router.put('/:meetId/division/flights', verifyToken, updateFlightsStructure);
 
 /**
  * POST /api/meets/:meetId/division/save

@@ -199,7 +199,6 @@ CREATE TABLE flights (
   id          SERIAL PRIMARY KEY,  -- ✅ SERIAL PRIMARY KEY (era INTEGER)
   meet_id     INTEGER NOT NULL,
   name        TEXT NOT NULL,             -- es: "Flight A (Mattina)"
-  ord         INTEGER NOT NULL,
   day_number  INTEGER NOT NULL DEFAULT 1 CHECK (day_number >= 1),  -- Giorno gara (1=primo giorno, 2=secondo, etc.)
   start_time  TEXT,                      -- Orario inizio flight (formato HH:MM, es: "09:00", "14:30")
   UNIQUE (meet_id, ord),

@@ -224,7 +224,6 @@ export interface DivisionFlight {
   id: number;
   meet_id: number;
   name: string;
-  ord: number;
   day_number: number;
   start_time: string;
   groups: DivisionGroup[];
