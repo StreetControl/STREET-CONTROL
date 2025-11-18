@@ -16,13 +16,26 @@ interface NominationData {
   flights: DivisionFlight[];
 }
 
-// Format day number (Giorno 1, Giorno 2, etc.)
-function formatDayNumber(dayNum: number): string {
-  return `Giorno ${dayNum}`;
+// Format date in Italian
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('it-IT', { 
+    weekday: 'long', 
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+// Calculate date for specific day of competition
+function getCompetitionDate(startDate: string, dayNumber: number): string {
+  const date = new Date(startDate);
+  date.setDate(date.getDate() + (dayNumber - 1));
+  return formatDate(date.toISOString());
 }
 
 export async function generateNominationPDF(data: NominationData) {
-  const doc = new jsPDF('landscape', 'mm', 'a4');
+  const doc = new jsPDF('portrait', 'mm', 'a4'); // PORTRAIT mode
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   
@@ -143,26 +156,62 @@ export async function generateNominationPDF(data: NominationData) {
       }
       isFirstPage = false;
 
-      // Add SLI Logo (top left)
+      let currentY = 15;
+
+      // Add SLI Logo (centered at top)
       try {
-        doc.setFontSize(10);
-        doc.text('SLI ITALIA', 10, 10);
+        // Load and add PNG logo
+        const logoImg = new Image();
+        logoImg.src = '/sli-logo.png';
+        await new Promise((resolve) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = resolve; // Continue even if logo fails
+        });
+        
+        if (logoImg.complete && logoImg.width > 0) {
+          const logoWidth = 50;
+          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+          doc.addImage(logoImg, 'PNG', (pageWidth - logoWidth) / 2, currentY, logoWidth, logoHeight);
+          currentY += logoHeight + 8;
+        } else {
+          // Fallback text
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(40, 40, 40);
+          doc.text('SLI ITALIA', pageWidth / 2, currentY, { align: 'center' });
+          currentY += 10;
+        }
       } catch (err) {
         console.error('Error loading logo:', err);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(40, 40, 40);
+        doc.text('SLI ITALIA', pageWidth / 2, currentY, { align: 'center' });
+        currentY += 10;
       }
 
       // Title - Meet Name
-      doc.setFontSize(18);
+      doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
-      const titleY = 25;
-      doc.text(data.meetName.toUpperCase(), pageWidth / 2, titleY, { align: 'center' });
+      doc.setTextColor(30, 30, 30);
+      doc.text(data.meetName.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+      currentY += 10;
 
-      // Subtitle - Day and Flight info
-      doc.setFontSize(14);
+      // Competition date for this day
+      const competitionDate = getCompetitionDate(data.meetDate, parseInt(dayNumber));
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      const subtitleY = titleY + 10;
-      const flightInfo = `${formatDayNumber(parseInt(dayNumber))} - ${flight.name} - INIZIO GARA ORE ${flight.start_time || ''}`;
-      doc.text(flightInfo, pageWidth / 2, subtitleY, { align: 'center' });
+      doc.setTextColor(80, 80, 80);
+      doc.text(competitionDate, pageWidth / 2, currentY, { align: 'center' });
+      currentY += 8;
+
+      // Flight info
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 60);
+      const flightInfo = `${flight.name} - INIZIO GARA ORE ${flight.start_time || ''}`;
+      doc.text(flightInfo, pageWidth / 2, currentY, { align: 'center' });
+      currentY += 10;
 
       // Prepare table data
       const tableData: any[] = [];
@@ -193,47 +242,55 @@ export async function generateNominationPDF(data: NominationData) {
         ]);
       });
 
-      // Generate table
+      // Generate table with minimal design
       autoTable(doc, {
-        startY: subtitleY + 15,
-        head: [['COGNOME', 'NOME', 'SQUADRA', 'DATA DI NASCITA', 'CATEGORIA ETA\'', 'CATEGORIA DI PESO', 'GRUPPO']],
+        startY: currentY,
+        head: [['COGNOME', 'NOME', 'SQUADRA', 'DATA NASCITA', 'CAT. ETÀ', 'CAT. PESO', 'GRUPPO']],
         body: tableData,
-        theme: 'grid',
+        theme: 'striped',
         styles: {
           fontSize: 9,
-          cellPadding: 3,
-          lineColor: [0, 0, 0],
-          lineWidth: 0.5,
+          cellPadding: 4,
+          textColor: [40, 40, 40],
+          lineColor: [220, 220, 220],
+          lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: [255, 215, 0], // Gold color
-          textColor: [0, 0, 0],
+          fillColor: [79, 70, 229], // Primary color from frontend (indigo-600)
+          textColor: [255, 255, 255],
           fontStyle: 'bold',
           halign: 'center',
+          fontSize: 10,
         },
         columnStyles: {
-          0: { cellWidth: 35 }, // COGNOME
-          1: { cellWidth: 35 }, // NOME
-          2: { cellWidth: 40 }, // SQUADRA
-          3: { cellWidth: 30, halign: 'center' }, // DATA NASCITA
-          4: { cellWidth: 30, halign: 'center' }, // CAT ETA
-          5: { cellWidth: 35, halign: 'center' }, // CAT PESO
-          6: { cellWidth: 20, halign: 'center' }, // GRUPPO
+          0: { cellWidth: 28 }, // COGNOME
+          1: { cellWidth: 28 }, // NOME
+          2: { cellWidth: 35 }, // SQUADRA
+          3: { cellWidth: 25, halign: 'center' }, // DATA NASCITA
+          4: { cellWidth: 22, halign: 'center' }, // CAT ETA
+          5: { cellWidth: 22, halign: 'center' }, // CAT PESO
+          6: { cellWidth: 18, halign: 'center' }, // GRUPPO
         },
         alternateRowStyles: {
-          fillColor: [240, 240, 240],
+          fillColor: [249, 250, 251], // Light gray for alternating rows
         },
-        margin: { left: 10, right: 10 },
+        margin: { left: 15, right: 15 },
       });
 
-      // Add footer with page number
+      // Add footer with page number and generation date
       const pageCount = (doc as any).internal.getNumberOfPages();
       doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
       doc.text(
         `Pagina ${pageCount}`,
-        pageWidth - 20,
+        pageWidth / 2,
         pageHeight - 10,
-        { align: 'right' }
+        { align: 'center' }
+      );
+      doc.text(
+        `Generato il ${new Date().toLocaleDateString('it-IT')}`,
+        15,
+        pageHeight - 10
       );
     }
   }
