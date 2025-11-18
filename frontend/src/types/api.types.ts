@@ -205,6 +205,8 @@ export interface DivisionAthlete {
   first_name: string;
   last_name: string;
   sex: Sex;
+  birth_date?: string;
+  team_name?: string;
   weight_category: string;
   flight_id?: number;
   flight_name?: string;
@@ -246,12 +248,18 @@ export interface GetDivisionResponse {
 }
 
 export interface SaveDivisionRequest {
-  flights: DivisionFlight[];
+  assignments: {
+    form_id: number;
+    group_id: number;
+    flight_id: number;
+  }[];
+  flights?: DivisionFlight[];
 }
 
 export interface SaveDivisionResponse {
   success: boolean;
   message?: string;
+  updated?: number;
 }
 
 // ============================================

@@ -13,6 +13,7 @@ import { createDivision, getDivision, saveDivision, updateFlightsStructure } fro
 import { supabase } from '../../services/supabase';
 import type { DivisionFlight, DivisionAthlete } from '../../types';
 import { Users, Download, Save, ChevronRight } from 'lucide-react';
+import { generateNominationPDF } from './NominationPDF';
 
 interface GroupDivisionTabProps {
   meetId?: string;
@@ -93,6 +94,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
   const [isEditingFlights, setIsEditingFlights] = useState(false);
   const [editedFlights, setEditedFlights] = useState<DivisionFlight[]>([]);
   const [meetDays, setMeetDays] = useState<number>(1);
+  const [originalAthleteAssignments, setOriginalAthleteAssignments] = useState<Map<number, number>>(new Map());
 
   // Load existing division on mount
   useEffect(() => {
@@ -220,6 +222,15 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
 
     setAthletesWithLifts(enriched);
     
+    // Save original assignments for change detection (form_id -> group_id)
+    const originalAssignments = new Map<number, number>();
+    enriched.forEach(athlete => {
+      if (athlete.group_id) {
+        originalAssignments.set(athlete.form_id, athlete.group_id);
+      }
+    });
+    setOriginalAthleteAssignments(originalAssignments);
+    
     // Expand all flights by default
     const flightIds = new Set(flightsData.map(f => f.id));
     setExpandedFlights(flightIds);
@@ -255,7 +266,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     }
   };
 
-  const handleSaveDivision = async () => {
+  const handleSaveAthleteAssignments = async () => {
     if (!meetId) {
       setError('Meet ID non disponibile');
       return;
@@ -266,10 +277,42 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     setSuccessMessage(null);
 
     try {
-      const response = await saveDivision(parseInt(meetId), { flights });
+      // Filter only athletes that have changed group (OPTIMIZED!)
+      const changedAssignments = athletesWithLifts
+        .filter(athlete => {
+          if (!athlete.group_id) return false;
+          const originalGroupId = originalAthleteAssignments.get(athlete.form_id);
+          return originalGroupId !== athlete.group_id; // Only if changed
+        })
+        .map(athlete => ({
+          form_id: athlete.form_id,
+          group_id: athlete.group_id!,
+          flight_id: athlete.flight_id!
+        }));
+
+      // If no changes, don't call backend
+      if (changedAssignments.length === 0) {
+        setSuccessMessage('Nessuna modifica da salvare');
+        setIsSaving(false);
+        return;
+      }
+
+      const response = await saveDivision(parseInt(meetId), { 
+        assignments: changedAssignments,
+        flights 
+      });
 
       if (response.success) {
-        setSuccessMessage('Struttura salvata con successo!');
+        setSuccessMessage(`Struttura salvata! ${response.updated} atleti aggiornati.`);
+        
+        // Update original assignments after successful save
+        const newOriginalAssignments = new Map<number, number>();
+        athletesWithLifts.forEach(athlete => {
+          if (athlete.group_id) {
+            newOriginalAssignments.set(athlete.form_id, athlete.group_id);
+          }
+        });
+        setOriginalAthleteAssignments(newOriginalAssignments);
       } else {
         setError(response.message || 'Errore durante il salvataggio');
       }
@@ -281,9 +324,45 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     }
   };
 
-  const handleExportNomination = () => {
-    // TODO: Implement Excel export (STEP 5)
-    alert('Export Excel - Da implementare nello STEP 5');
+  const handleExportNomination = async () => {
+    if (!meetId) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch meet information
+      const { data: meetData, error: meetError } = await supabase
+        .from('meets')
+        .select('name, start_date')
+        .eq('id', meetId)
+        .single();
+
+      if (meetError || !meetData) {
+        throw new Error('Errore nel caricamento dei dati della gara');
+      }
+
+      // Prepare data for PDF
+      const pdfData = {
+        meetName: meetData.name,
+        meetDate: meetData.start_date,
+        flights: flights.map(flight => ({
+          ...flight,
+          athletes: athletesWithLifts.filter(a => a.flight_id === flight.id)
+        }))
+      };
+
+      // Generate PDF
+      await generateNominationPDF(pdfData);
+
+      setSuccessMessage('PDF generato con successo!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Errore generazione PDF:', err);
+      setError(err.message || 'Errore durante la generazione del PDF');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Move athlete to new group (local state only)
@@ -620,23 +699,23 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
           {/* Save Structure Button */}
           {divisionExists && (
             <button
-              onClick={handleSaveDivision}
+              onClick={handleSaveAthleteAssignments}
               disabled={isSaving}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-bold text-lg transition-all flex items-center gap-3 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              <Save className="w-5 h-5" />
-              {isSaving ? 'Salvataggio...' : 'SALVA STRUTTURA E STAMPA NOMINATION'}
+              <Save className="w-6 h-6" />
+              {isSaving ? '⏳ SALVATAGGIO IN CORSO...' : '💾 SALVA STRUTTURA'}
             </button>
           )}
 
-          {/* Export Button */}
+          {/* Print Nomination Button */}
           {divisionExists && (
             <button
               onClick={handleExportNomination}
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
             >
               <Download className="w-5 h-5" />
-              ESPORTA EXCEL
+              🖨️ STAMPA NOMINATION
             </button>
           )}
 

@@ -399,6 +399,7 @@ export async function getDivision(req: AuthRequest, res: Response): Promise<Resp
             first_name: athlete?.first_name,
             last_name: athlete?.last_name,
             sex: athlete?.sex,
+            birth_date: athlete?.birth_date,
             weight_category: weightCat?.name || 'N/A'
           };
         }).filter((a: any) => a !== null) // Remove nulls
@@ -428,37 +429,52 @@ export async function getDivision(req: AuthRequest, res: Response): Promise<Resp
  */
 export async function saveDivision(req: AuthRequest, res: Response): Promise<Response> {
   try {
-    const { meetId } = req.params;
-    const { flights } = req.body;
+    const { assignments } = req.body;
+    const authUser = req.user;
 
-    if (!flights || !Array.isArray(flights)) {
+    if (!authUser) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Unauthorized' 
+      });
+    }
+
+    if (!assignments || !Array.isArray(assignments)) {
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid flights data' 
+        error: 'Invalid assignments data' 
       });
     }
 
-    // Delete existing division
-    const { error: deleteError } = await supabaseAdmin
-      .from('flights')
-      .delete()
-      .eq('meet_id', meetId);
-
-    if (deleteError) {
-      return res.status(500).json({ 
-        success: false,
-        error: 'Failed to delete old division' 
-      });
-    }
-
-    // Insert new division (same logic as createDivision)
-    // Re-insert flights, groups, nominations from req.body
+    // Update each athlete's nomination with new group
+    // Note: flight_id is not stored in nomination table, it's derived from groups.flight_id
+    let updatedCount = 0;
     
-    // ... (implementeremo nello step successivo)
+    for (const assignment of assignments) {
+      const { form_id, group_id } = assignment;
+
+      if (!form_id || !group_id) {
+        continue; // Skip invalid assignments
+      }
+
+      // Update nomination table with new group_id
+      const { error: updateError } = await supabaseAdmin
+        .from('nomination')
+        .update({ group_id })
+        .eq('form_id', form_id);
+
+      if (updateError) {
+        console.error(`Error updating nomination for form_id ${form_id}:`, updateError);
+        // Continue with other assignments even if one fails
+      } else {
+        updatedCount++;
+      }
+    }
 
     return res.json({
       success: true,
-      message: 'Division saved successfully'
+      message: 'Athlete assignments saved successfully',
+      updated: updatedCount
     });
 
   } catch (error: any) {
