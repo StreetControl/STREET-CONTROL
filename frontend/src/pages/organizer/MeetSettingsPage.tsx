@@ -138,7 +138,7 @@ export default function MeetSettingsPage() {
         {activeTab === 'info' && <InfoTab onMeetCreated={handleMeetCreated} existingMeetId={createdMeetId} />}
         {activeTab === 'registration' && <RegistrationTab meetId={createdMeetId} />}
         {activeTab === 'group-division' && <GroupDivisionTab meetId={createdMeetId} />}
-        {activeTab === 'pre-meet' && <PreMeetTab />}
+        {activeTab === 'pre-meet' && <PreMeetTab meetId={createdMeetId} />}
       </div>
     </div>
   );

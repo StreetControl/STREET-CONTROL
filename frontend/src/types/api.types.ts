@@ -281,3 +281,66 @@ export interface Attempt {
   override_reason?: string;
   created_at: string;
 }
+
+// ============================================
+// WEIGH-IN API
+// ============================================
+
+export interface WeighInAthlete {
+  nomination_id: number;
+  form_id: number;
+  athlete_id: number;
+  cf: string;
+  first_name: string;
+  last_name: string;
+  sex: 'M' | 'F';
+  birth_date: string;
+  weight_category: string;
+  weight_cat_id: number;
+  // Weigh-in data
+  weight_in_info_id: number | null;
+  bodyweight_kg: number | null;
+  rack_height: number;
+  belt_height: number;
+  out_of_weight: number; // 0 or 1
+  notes: string;
+  // Openers (first attempts for each lift)
+  openers: Record<string, number | null>; // { 'MU': 15, 'PU': 60, etc. }
+}
+
+export interface WeighInGroup {
+  id: number;
+  name: string;
+  ord: number;
+  athletes: WeighInAthlete[];
+}
+
+export interface WeighInFlight {
+  id: number;
+  name: string;
+  day_number: number;
+  start_time: string | null;
+  groups: WeighInGroup[];
+}
+
+export interface GetWeighInResponse {
+  success: boolean;
+  flights: WeighInFlight[];
+  lifts: string[]; // ['MU', 'PU', 'DIP', 'SQ'] based on meet type
+  message?: string;
+}
+
+export interface UpdateWeighInRequest {
+  bodyweight_kg?: number | null;
+  rack_height?: number;
+  belt_height?: number;
+  out_of_weight?: number; // 0 or 1
+  notes?: string;
+  openers?: Record<string, number | null>; // { 'MU': 15, 'PU': 60, etc. }
+}
+
+export interface UpdateWeighInResponse {
+  success: boolean;
+  weight_in_info_id: number;
+  message?: string;
+}
