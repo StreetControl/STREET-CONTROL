@@ -13,7 +13,7 @@ import { createDivision, getDivision, saveDivision, updateFlightsStructure, upda
 import { supabase } from '../../services/supabase';
 import type { DivisionFlight, DivisionAthlete } from '../../types';
 import { Users, Download, Save, Settings, Calendar, Clock, Trash2, X, AlertTriangle } from 'lucide-react';
-import { generateNominationPDF } from './NominationPDF';
+import { generateNominationFiles } from './NominationPDF';
 
 interface GroupDivisionTabProps {
   meetId?: string;
@@ -408,10 +408,10 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
         }))
       };
 
-      // Generate PDF
-      await generateNominationPDF(pdfData);
+      // Generate ZIP with PDF and Excel
+      await generateNominationFiles(pdfData);
 
-      setSuccessMessage('PDF generato con successo!');
+      setSuccessMessage('File ZIP con PDF e Excel generato con successo!');
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
       console.error('Errore generazione PDF:', err);
