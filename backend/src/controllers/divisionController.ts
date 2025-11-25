@@ -332,7 +332,7 @@ export async function getDivision(req: AuthRequest, res: Response): Promise<Resp
         name,
         day_number,
         start_time,
-        groups (
+        groups!inner (
           id,
           flight_id,
           name,
@@ -365,7 +365,8 @@ export async function getDivision(req: AuthRequest, res: Response): Promise<Resp
       `)
       .eq('meet_id', meetId)
       .order('day_number', { ascending: true })
-      .order('start_time', { ascending: true });
+      .order('start_time', { ascending: true })
+      .order('ord', { referencedTable: 'groups', ascending: true });
 
     if (flightsError) {
       return res.status(500).json({ 
@@ -530,8 +531,138 @@ export async function updateFlightsStructure(req: AuthRequest, res: Response): P
     const incomingFlightIds = flights.filter(f => f.id > 0 && existingFlightIds.includes(f.id)).map(f => f.id);
     const flightsToDelete = existingFlightIds.filter(id => !incomingFlightIds.includes(id));
 
-    // Delete removed flights (cascade will delete groups and nominations)
+    // Track newly created groups to exclude from deletion
+    const newlyCreatedGroupIds: number[] = [];
+
+    // STEP 1: Before deleting flights, relocate all athletes to a new group in nearest flight
     if (flightsToDelete.length > 0) {
+      for (const flightIdToDelete of flightsToDelete) {
+        // Get all groups of this flight
+        const { data: groupsToDelete, error: groupsError } = await supabaseAdmin
+          .from('groups')
+          .select('id')
+          .eq('flight_id', flightIdToDelete);
+
+        if (groupsError) {
+          console.error('Error fetching groups to delete:', groupsError);
+          continue;
+        }
+
+        if (!groupsToDelete || groupsToDelete.length === 0) {
+          continue; // No groups, skip
+        }
+
+        const groupIdsToDelete = groupsToDelete.map(g => g.id);
+
+        // Get all nominations (athletes) from these groups
+        const { data: nominationsToMove, error: nominationsError } = await supabaseAdmin
+          .from('nomination')
+          .select('id, form_id')
+          .in('group_id', groupIdsToDelete);
+
+        if (nominationsError) {
+          console.error('Error fetching nominations to move:', nominationsError);
+          continue;
+        }
+
+        // If there are athletes to relocate
+        if (nominationsToMove && nominationsToMove.length > 0) {
+          // Find nearest flight (next or previous)
+          const currentFlightIndex = existingFlightIds.indexOf(flightIdToDelete);
+          let targetFlightId: number | null = null;
+
+          // Try next flight first
+          if (currentFlightIndex < existingFlightIds.length - 1) {
+            const nextFlightId = existingFlightIds[currentFlightIndex + 1];
+            if (incomingFlightIds.includes(nextFlightId)) {
+              targetFlightId = nextFlightId;
+            }
+          }
+
+          // If no next, try previous
+          if (!targetFlightId && currentFlightIndex > 0) {
+            const prevFlightId = existingFlightIds[currentFlightIndex - 1];
+            if (incomingFlightIds.includes(prevFlightId)) {
+              targetFlightId = prevFlightId;
+            }
+          }
+
+          // If still no target, use first available flight from incoming flights
+          if (!targetFlightId && incomingFlightIds.length > 0) {
+            targetFlightId = incomingFlightIds[0];
+          }
+
+          // If we have a target flight, create a new group and move athletes
+          if (targetFlightId) {
+            // Calculate next group ord based on existing groups in this meet
+            // Same logic as frontend: find max group number from all groups in remaining flights
+            const { data: meetFlights } = await supabaseAdmin
+              .from('flights')
+              .select('id, groups(name, ord)')
+              .eq('meet_id', meetId)
+              .neq('id', flightIdToDelete); // Exclude the flight being deleted
+
+            let maxGroupNumber = 0;
+            if (meetFlights) {
+              meetFlights.forEach(f => {
+                if (f.groups) {
+                  f.groups.forEach((g: any) => {
+                    const groupNum = parseInt(g.name.replace(/\D/g, '')) || 0;
+                    if (groupNum > maxGroupNumber) maxGroupNumber = groupNum;
+                  });
+                }
+              });
+            }
+
+            const nextOrd = maxGroupNumber + 1;
+
+            // Create new group in target flight
+            const { data: newGroup, error: newGroupError } = await supabaseAdmin
+              .from('groups')
+              .insert({
+                flight_id: targetFlightId,
+                name: `Gruppo ${nextOrd}`,
+                ord: nextOrd
+              })
+              .select('id')
+              .single();
+
+            if (newGroupError || !newGroup) {
+              console.error('Error creating new group for relocated athletes:', newGroupError);
+              return res.status(500).json({
+                success: false,
+                error: 'Failed to create new group for relocated athletes'
+              });
+            }
+
+            // Track this newly created group so we don't delete it later
+            newlyCreatedGroupIds.push(newGroup.id);
+
+            // Move all nominations to the new group
+            const nominationIds = nominationsToMove.map(n => n.id);
+            const { error: updateNominationsError } = await supabaseAdmin
+              .from('nomination')
+              .update({ group_id: newGroup.id })
+              .in('id', nominationIds);
+
+            if (updateNominationsError) {
+              console.error('Error moving nominations:', updateNominationsError);
+              return res.status(500).json({
+                success: false,
+                error: 'Failed to move athletes to new group'
+              });
+            }
+          } else {
+            // No target flight available - this shouldn't happen, but handle it
+            return res.status(400).json({
+              success: false,
+              error: 'Cannot delete flight: no other flights available to relocate athletes'
+            });
+          }
+        }
+      }
+
+      // STEP 2: Now safe to delete flights (athletes already moved)
       const { error: deleteError } = await supabaseAdmin
         .from('flights')
         .delete()
@@ -562,7 +693,10 @@ export async function updateFlightsStructure(req: AuthRequest, res: Response): P
       });
     });
 
-    const groupsToDelete = existingGroupIds.filter(id => !incomingGroupIds.includes(id));
+    // Exclude newly created groups from deletion
+    const groupsToDelete = existingGroupIds.filter(id => 
+      !incomingGroupIds.includes(id) && !newlyCreatedGroupIds.includes(id)
+    );
 
     // Redistribute athletes from deleted groups to first available group in same flight
     if (groupsToDelete.length > 0) {

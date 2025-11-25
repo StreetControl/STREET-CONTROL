@@ -558,8 +558,19 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     setError(null);
     
     try {
+      // Clean editedFlights: remove groups with temporary IDs (created for visual preview)
+      // Backend will create these groups automatically during flight deletion
+      const cleanedFlights = editedFlights.map(flight => ({
+        ...flight,
+        groups: flight.groups.filter(group => {
+          // Keep only groups with real IDs (from database) or new groups explicitly created by user
+          // Temporary IDs from Date.now() are typically > 1700000000000
+          return group.id < 1000000000000; // Filter out Date.now() IDs
+        })
+      }));
+
       // Save flight structure to database
-      await updateFlightsStructure(parseInt(meetId), editedFlights);
+      await updateFlightsStructure(parseInt(meetId), cleanedFlights);
       
       // Reload division from backend to get updated IDs and structure
       const response = await getDivision(parseInt(meetId));
@@ -618,7 +629,69 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
   };
 
   const handleRemoveFlight = (flightId: number) => {
-    setEditedFlights(editedFlights.filter(f => f.id !== flightId));
+    // Find the flight to remove and its index
+    const flightToRemove = editedFlights.find(f => f.id === flightId);
+    if (!flightToRemove) return;
+
+    const currentFlightIndex = editedFlights.findIndex(f => f.id === flightId);
+    
+    // Collect all athletes from this flight
+    const athletesToRelocate: DivisionAthlete[] = [];
+    flightToRemove.groups.forEach(group => {
+      if (group.athletes && group.athletes.length > 0) {
+        athletesToRelocate.push(...group.athletes);
+      }
+    });
+
+    // Find nearest flight using same logic as backend
+    let targetFlightId: number | null = null;
+
+    // Try next flight first
+    if (currentFlightIndex < editedFlights.length - 1) {
+      targetFlightId = editedFlights[currentFlightIndex + 1].id;
+    }
+    // If no next, try previous
+    else if (currentFlightIndex > 0) {
+      targetFlightId = editedFlights[currentFlightIndex - 1].id;
+    }
+
+    // Remove the flight and create new group in target flight if needed
+    const remainingFlights = editedFlights.filter(f => f.id !== flightId);
+
+    if (athletesToRelocate.length > 0 && targetFlightId !== null) {
+      // Calculate next group number
+      let maxGroupNumber = 0;
+      remainingFlights.forEach(flight => {
+        flight.groups.forEach(group => {
+          const groupNum = parseInt(group.name.replace(/\D/g, '')) || 0;
+          if (groupNum > maxGroupNumber) maxGroupNumber = groupNum;
+        });
+      });
+
+      // Create new group in target flight with relocated athletes
+      const updatedFlights = remainingFlights.map(flight => {
+        if (flight.id === targetFlightId) {
+          const newGroup = {
+            id: Date.now(), // Temporary ID
+            flight_id: targetFlightId,
+            name: `Gruppo ${maxGroupNumber + 1}`,
+            ord: maxGroupNumber + 1,
+            athletes: athletesToRelocate
+          };
+
+          return {
+            ...flight,
+            groups: [...flight.groups, newGroup]
+          };
+        }
+        return flight;
+      });
+
+      setEditedFlights(updatedFlights);
+    } else {
+      // No athletes to relocate, just remove the flight
+      setEditedFlights(remainingFlights);
+    }
   };
 
   const handleUpdateFlight = (flightId: number, field: string, value: any) => {
