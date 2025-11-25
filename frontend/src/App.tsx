@@ -13,6 +13,7 @@ import SelectRolePage from './pages/auth/SelectRolePage';
 // Main Pages
 import MeetListPage from './pages/MeetListPage';
 import MeetSettingsPage from './pages/organizer/MeetSettingsPage';
+import DirectorPage from './pages/director/DirectorPage';
 
 function App() {
   const { isAuthenticated, hasActiveRole } = useAuth();
@@ -68,6 +69,16 @@ function App() {
           element={
             <ProtectedRoute requireActiveRole>
               <MeetSettingsPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* DIRECTOR Route - Competition management */}
+        <Route 
+          path="/meets/:meetId/director" 
+          element={
+            <ProtectedRoute requireActiveRole requireRole="DIRECTOR">
+              <DirectorPage />
             </ProtectedRoute>
           } 
         />

@@ -334,6 +334,52 @@ export async function updateWeighIn(
 }
 
 // ============================================
+// DIRECTOR API
+// ============================================
+
+/**
+ * Get complete director state (flights, groups, lifts)
+ */
+export async function getDirectorState(meetId: number): Promise<any> {
+  const response = await api.get(`/director/meets/${meetId}/state`);
+  return response.data;
+}
+
+/**
+ * Get athletes in a group with their attempts for a specific lift
+ */
+export async function getGroupAthletes(groupId: number, liftId: string): Promise<any> {
+  const response = await api.get(`/director/groups/${groupId}/athletes`, {
+    params: { liftId }
+  });
+  return response.data;
+}
+
+/**
+ * Update attempt weight or status
+ */
+export async function updateAttemptDirector(attemptId: number, data: {
+  weight_kg?: number;
+  status?: 'PENDING' | 'VALID' | 'INVALID';
+}): Promise<any> {
+  const response = await api.patch(`/director/attempts/${attemptId}`, data);
+  return response.data;
+}
+
+/**
+ * Create next attempt (2 or 3)
+ */
+export async function createNextAttempt(data: {
+  weight_kg: number;
+  lift_id: string;
+  weight_in_info_id: number;
+  attempt_no: number;
+}): Promise<any> {
+  const response = await api.post('/director/attempts', data);
+  return response.data;
+}
+
+// ============================================
 // EXPORT DEFAULT
 // ============================================
 

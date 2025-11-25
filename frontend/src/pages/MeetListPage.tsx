@@ -56,8 +56,12 @@ const MeetListPage = () => {
   };
 
   const handleMeetClick = (meetId: number) => {
-    // Navigate to settings page, registration tab will be default for existing meets
-    navigate(`/meets/${meetId}/settings`);
+    // DIRECTOR navigates to director page, others to settings
+    if (activeRole?.role === 'DIRECTOR') {
+      navigate(`/meets/${meetId}/director`);
+    } else {
+      navigate(`/meets/${meetId}/settings`);
+    }
   };
 
   const handleCreateMeet = () => {
