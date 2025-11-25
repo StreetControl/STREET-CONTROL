@@ -558,14 +558,14 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
     setError(null);
     
     try {
-      // Clean editedFlights: remove groups with temporary IDs (created for visual preview)
-      // Backend will create these groups automatically during flight deletion
+      // Clean editedFlights: remove groups with Date.now() IDs (created for relocation preview)
+      // Keep groups with negative IDs (new groups) and positive IDs (existing groups)
       const cleanedFlights = editedFlights.map(flight => ({
         ...flight,
         groups: flight.groups.filter(group => {
-          // Keep only groups with real IDs (from database) or new groups explicitly created by user
-          // Temporary IDs from Date.now() are typically > 1700000000000
-          return group.id < 1000000000000; // Filter out Date.now() IDs
+          // Keep: negative IDs (new groups) and positive IDs (existing groups)
+          // Filter out: Date.now() IDs (> 1000000000000) used for relocation preview
+          return group.id < 1000000000000;
         })
       }));
 
@@ -596,8 +596,9 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
   };
 
   const handleAddFlight = () => {
-    const maxId = Math.max(0, ...editedFlights.map(f => f.id));
-    const newFlightId = maxId + 1;
+    // Use negative IDs for new flights to distinguish from existing ones
+    const minId = Math.min(0, ...editedFlights.map(f => f.id));
+    const newFlightId = minId - 1;
     
     // Calculate next progressive group number across all flights
     let maxGroupNumber = 0;
@@ -608,6 +609,10 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
       });
     });
     
+    // Use negative ID for new group (will be created in backend)
+    const minGroupId = Math.min(0, ...editedFlights.flatMap(f => f.groups.map(g => g.id)));
+    const newGroupId = minGroupId - 1;
+    
     const newFlight: DivisionFlight = {
       id: newFlightId,
       meet_id: parseInt(meetId!),
@@ -616,7 +621,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
       start_time: '09:00',
       groups: [
         {
-          id: Date.now(),
+          id: newGroupId,
           flight_id: newFlightId,
           name: `Gruppo ${maxGroupNumber + 1}`,
           ord: maxGroupNumber + 1,
@@ -672,7 +677,7 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
       const updatedFlights = remainingFlights.map(flight => {
         if (flight.id === targetFlightId) {
           const newGroup = {
-            id: Date.now(), // Temporary ID
+            id: Date.now(), // Temporary ID for preview (will be filtered before save)
             flight_id: targetFlightId,
             name: `Gruppo ${maxGroupNumber + 1}`,
             ord: maxGroupNumber + 1,
@@ -713,10 +718,14 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
       });
     });
 
+    // Use negative ID for new group (will be created in backend)
+    const minGroupId = Math.min(0, ...editedFlights.flatMap(f => f.groups.map(g => g.id)));
+    const newGroupId = minGroupId - 1;
+
     setEditedFlights(editedFlights.map(f => {
       if (f.id === flightId) {
         const newGroup = {
-          id: Date.now(),
+          id: newGroupId,
           flight_id: flightId,
           name: `Gruppo ${maxGroupNumber + 1}`,
           ord: maxGroupNumber + 1,

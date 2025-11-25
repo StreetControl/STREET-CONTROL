@@ -145,8 +145,8 @@ export default function RegistrationTab({ meetId }: RegistrationTabProps) {
 # Formato categoria peso: es. '-59M', '-66M', '-73M', '-80M', '+101M' (uomini); '-52F', '-57F', '-63F', '+70F' (donne)
 # Sesso: M o F
 # Esempi:
-${exampleRow1Values.join(',')}
-${exampleRow2Values.join(',')}`;
+# ${exampleRow1Values.join(',')}
+# ${exampleRow2Values.join(',')}`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
