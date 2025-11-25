@@ -14,6 +14,7 @@ import authRoutes from './routes/auth.js';
 import meetsRoutes from './routes/meets.js';
 import athletesRoutes from './routes/athletes.js';
 import divisionRoutes from './routes/division.js';
+import weighInRoutes from './routes/weighIn.js';
 
 // Load environment variables
 dotenv.config();
@@ -105,6 +106,10 @@ app.use('/api', athletesRoutes);
 
 // Division routes (nested under meets)
 app.use('/api/meets', divisionRoutes);
+
+// Weigh-in routes (nested under meets)
+app.use('/api/meets', weighInRoutes);
+app.use('/api', weighInRoutes);
 
 // ============================================
 // ERROR HANDLING

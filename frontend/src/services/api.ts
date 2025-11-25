@@ -311,6 +311,29 @@ export async function updateWeightCategory(meetId: number, formId: number, weigh
 }
 
 // ============================================
+// WEIGH-IN API
+// ============================================
+
+/**
+ * Get all athletes with weigh-in data for a meet (organized by flights/groups)
+ */
+export async function getWeighInAthletes(meetId: number): Promise<import('../types').GetWeighInResponse> {
+  const response = await api.get<import('../types').GetWeighInResponse>(`/meets/${meetId}/weigh-in`);
+  return response.data;
+}
+
+/**
+ * Update weigh-in data and openers for a specific athlete
+ */
+export async function updateWeighIn(
+  nominationId: number, 
+  data: import('../types').UpdateWeighInRequest
+): Promise<import('../types').UpdateWeighInResponse> {
+  const response = await api.patch<import('../types').UpdateWeighInResponse>(`/weigh-in/${nominationId}`, data);
+  return response.data;
+}
+
+// ============================================
 // EXPORT DEFAULT
 // ============================================
 

@@ -54,6 +54,12 @@ export type {
   SaveDivisionResponse,
   Lift,
   Attempt,
+  WeighInAthlete,
+  WeighInGroup,
+  WeighInFlight,
+  GetWeighInResponse,
+  UpdateWeighInRequest,
+  UpdateWeighInResponse,
 } from './api.types';
 
 // Common Types
