@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { createMeet, updateMeet } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { MEET_LEVELS, REGULATION_CODES, SCORE_TYPES } from '../../config/meetConfig';
-import { Edit } from 'lucide-react';
+import { Edit, Save } from 'lucide-react';
 import type { CreateMeetRequest } from '../../types';
 
 interface MeetType {
@@ -493,9 +493,10 @@ export default function InfoTab({ onMeetCreated, existingMeetId }: InfoTabProps)
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-primary px-8"
+              className="btn-primary px-8 flex items-center gap-2"
             >
-              {isSubmitting ? 'Salvataggio in corso...' : '💾 SALVA MODIFICHE'}
+              <Save className="w-5 h-5" />
+              {isSubmitting ? 'Salvataggio in corso...' : 'SALVA MODIFICHE'}
             </button>
           </div>
         )}

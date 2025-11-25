@@ -846,6 +846,29 @@ export default function GroupDivisionTab({ meetId }: GroupDivisionTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Loading Overlay with Spinner (same as RegistrationTab) */}
+      {isCreating && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-dark-bg-secondary border-2 border-primary rounded-lg p-8 flex flex-col items-center gap-4">
+            {/* Spinning Loader */}
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-4 border-primary/30 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-primary rounded-full animate-spin"></div>
+            </div>
+            
+            {/* Loading Text */}
+            <div className="text-center">
+              <p className="text-lg font-semibold text-dark-text mb-1">
+                Creazione divisione in corso...
+              </p>
+              <p className="text-sm text-dark-text-secondary">
+                Attendere, potrebbe volerci qualche minuto.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Message */}
       {successMessage && (
         <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">

@@ -151,10 +151,10 @@ const MeetListPage = () => {
               </section>
             )}
 
-            {/* Two Column Layout: Past Meets (left) and Active Meets (right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-              {/* Past Meets Section - Left Column */}
-              <section className="flex flex-col lg:pr-4 lg:border-r lg:border-dark-border">
+            {/* Two Column Layout: Past Meets (left 2/5) and Active Meets (right 3/5) */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-0">
+              {/* Past Meets Section - Left Column (2/5) */}
+              <section className="flex flex-col lg:col-span-2 lg:pr-4 lg:border-r lg:border-dark-border">
                 <h2 className="text-2xl font-bold text-primary mb-6 underline decoration-2 underline-offset-4">
                   GARE PASSATE
                 </h2>
@@ -197,8 +197,8 @@ const MeetListPage = () => {
                 </div>
               </section>
 
-              {/* Active Meets Section - Right Column */}
-              <section className="flex flex-col lg:pl-4 mt-8 lg:mt-0">
+              {/* Active Meets Section - Right Column (3/5) */}
+              <section className="flex flex-col lg:col-span-3 lg:pl-4 mt-8 lg:mt-0">
                 <h2 className="text-2xl font-bold text-primary mb-6 underline decoration-2 underline-offset-4">
                   GARE ATTIVE
                 </h2>
