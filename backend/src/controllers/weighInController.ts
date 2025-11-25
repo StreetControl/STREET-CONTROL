@@ -116,7 +116,9 @@ export async function getWeighInAthletes(req: AuthRequest, res: Response): Promi
                   ),
                   weight_categories_std (
                     id,
-                    name
+                    name,
+                    min_kg,
+                    max_kg
                   )
                 )
               `)
@@ -172,6 +174,8 @@ export async function getWeighInAthletes(req: AuthRequest, res: Response): Promi
                   birth_date: athlete?.birth_date,
                   weight_category: weightCat?.name,
                   weight_cat_id: formInfo?.weight_cat_id,
+                  min_kg: weightCat?.min_kg || 0,
+                  max_kg: weightCat?.max_kg || null,
                   // Weigh-in data
                   weight_in_info_id: weighInData?.id || null,
                   bodyweight_kg: weighInData?.bodyweight_kg || null,

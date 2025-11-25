@@ -74,10 +74,14 @@ export default function PreMeetTab({ meetId }: PreMeetTabProps) {
 
     flights.forEach(flight => {
       flight.groups.forEach(group => {
-        const matchingAthletes = group.athletes.filter(athlete => 
-          athlete.first_name.toLowerCase().includes(query) ||
-          athlete.last_name.toLowerCase().includes(query)
-        );
+        const matchingAthletes = group.athletes.filter(athlete => {
+          const fullName = `${athlete.first_name} ${athlete.last_name}`.toLowerCase();
+          const reverseName = `${athlete.last_name} ${athlete.first_name}`.toLowerCase();
+          return athlete.first_name.toLowerCase().includes(query) ||
+                 athlete.last_name.toLowerCase().includes(query) ||
+                 fullName.includes(query) ||
+                 reverseName.includes(query);
+        });
 
         if (matchingAthletes.length > 0) {
           allMatchingGroups.push({
@@ -117,8 +121,28 @@ export default function PreMeetTab({ meetId }: PreMeetTabProps) {
     try {
       const response = await updateWeighIn(nominationId, data);
       if (response.success) {
-        // Reload data to reflect changes
-        await loadWeighInData();
+        // Update local state instead of reloading everything
+        setFlights(prevFlights => 
+          prevFlights.map(flight => ({
+            ...flight,
+            groups: flight.groups.map(group => ({
+              ...group,
+              athletes: group.athletes.map(athlete => 
+                athlete.nomination_id === nominationId
+                  ? {
+                      ...athlete,
+                      bodyweight_kg: data.bodyweight_kg,
+                      rack_height: data.rack_height,
+                      belt_height: data.belt_height,
+                      out_of_weight: data.out_of_weight,
+                      notes: data.notes,
+                      openers: data.openers
+                    }
+                  : athlete
+              )
+            }))
+          }))
+        );
       } else {
         throw new Error(response.message || 'Errore durante il salvataggio');
       }

@@ -45,15 +45,57 @@ export default function AthleteWeighInRow({ athlete, lifts, onSave }: AthleteWei
     setIsSaving(true);
 
     try {
+      // Validazione campi obbligatori
+      if (bodyweight.trim() === '') {
+        throw new Error('Il peso corporeo è obbligatorio');
+      }
+
+      const bw = parseFloat(bodyweight.replace(',', '.'));
+      if (isNaN(bw)) {
+        throw new Error('Il peso corporeo deve essere un numero valido');
+      }
+
+      // Validazione range peso categoria (se non out of weight)
+      if (!outOfWeight) {
+        if (bw < athlete.min_kg) {
+          throw new Error(`Bw troppo basso`);
+        }
+        if (athlete.max_kg !== null && bw > athlete.max_kg) {
+          throw new Error(`Bw troppo alto`);
+        }
+      }
+
+      // Validazione rack e belt
+      if (rackHeight.trim() === '') {
+        throw new Error('L\'altezza del rack è obbligatoria');
+      }
+      if (beltHeight.trim() === '') {
+        throw new Error('L\'altezza della cintura è obbligatoria');
+      }
+
       // Convert openers string values to numbers or null
       const openersData: Record<string, number | null> = {};
+      let hasAllOpeners = true;
       Object.keys(openers).forEach(liftId => {
-        const val = openers[liftId].trim();
-        openersData[liftId] = val === '' ? null : parseFloat(val);
+        const val = openers[liftId].replace(',', '.').trim();
+        if (val === '') {
+          hasAllOpeners = false;
+          openersData[liftId] = null;
+        } else {
+          const num = parseFloat(val);
+          if (isNaN(num)) {
+            throw new Error(`Il valore per ${liftId} deve essere un numero valido`);
+          }
+          openersData[liftId] = num;
+        }
       });
 
+      if (!hasAllOpeners) {
+        throw new Error('Tutti i pesi di apertura sono obbligatori');
+      }
+
       await onSave(athlete.nomination_id, {
-        bodyweight_kg: bodyweight.trim() === '' ? null : parseFloat(bodyweight),
+        bodyweight_kg: bw,
         rack_height: parseInt(rackHeight) || 0,
         belt_height: parseInt(beltHeight) || 0,
         out_of_weight: outOfWeight ? 1 : 0,
@@ -74,7 +116,13 @@ export default function AthleteWeighInRow({ athlete, lifts, onSave }: AthleteWei
     }));
   };
 
-  const isDataEntered = bodyweight.trim() !== '' || Object.values(openers).some(v => v.trim() !== '');
+  // Tutti i campi obbligatori devono essere compilati (out_of_weight è opzionale)
+  const allRequiredFieldsFilled = 
+    bodyweight.trim() !== '' &&
+    rackHeight.trim() !== '' &&
+    beltHeight.trim() !== '' &&
+    Object.values(openers).every(v => v.trim() !== '');
+  
   const hasUnsavedChanges = 
     bodyweight !== (athlete.bodyweight_kg?.toString() || '') ||
     rackHeight !== (athlete.rack_height?.toString() || '0') ||
@@ -112,10 +160,15 @@ export default function AthleteWeighInRow({ athlete, lifts, onSave }: AthleteWei
       {/* BODYWEIGHT */}
       <td className="px-3 py-3">
         <input
-          type="number"
-          step="0.1"
+          type="text"
           value={bodyweight}
           onChange={(e) => setBodyweight(e.target.value)}
+          onKeyPress={(e) => {
+            // Accetta solo numeri, punto e virgola
+            if (!/[0-9.,]/.test(e.key)) {
+              e.preventDefault();
+            }
+          }}
           placeholder="kg"
           className="w-20 px-2 py-1 text-sm bg-dark-bg border border-dark-border rounded text-dark-text focus:border-primary focus:outline-none"
         />
@@ -157,10 +210,15 @@ export default function AthleteWeighInRow({ athlete, lifts, onSave }: AthleteWei
       {lifts.map((liftId) => (
         <td key={liftId} className="px-3 py-3">
           <input
-            type="number"
-            step="0.5"
+            type="text"
             value={openers[liftId] || ''}
             onChange={(e) => handleOpenerChange(liftId, e.target.value)}
+            onKeyPress={(e) => {
+              // Accetta solo numeri, punto e virgola
+              if (!/[0-9.,]/.test(e.key)) {
+                e.preventDefault();
+              }
+            }}
             placeholder="kg"
             className="w-20 px-2 py-1 text-sm bg-dark-bg border border-dark-border rounded text-dark-text focus:border-primary focus:outline-none"
           />
@@ -173,10 +231,10 @@ export default function AthleteWeighInRow({ athlete, lifts, onSave }: AthleteWei
           {/* Save button */}
           <button
             onClick={handleSave}
-            disabled={isSaving || !isDataEntered}
+            disabled={isSaving || !allRequiredFieldsFilled}
             className={`
               px-2.5 py-1 rounded text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap
-              ${isSaving || !isDataEntered
+              ${isSaving || !allRequiredFieldsFilled
                 ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                 : 'bg-primary hover:bg-primary-dark text-white'
               }
@@ -197,9 +255,12 @@ export default function AthleteWeighInRow({ athlete, lifts, onSave }: AthleteWei
 
           {/* Status indicators below button */}
           {error && (
-            <div className="flex items-center gap-1 text-red-400 text-[10px]">
-              <AlertCircle className="w-3 h-3" />
-              <span>Errore</span>
+            <div className="flex flex-col items-center gap-0.5 text-red-400 text-[11px] max-w-[200px] text-center">
+              <div className="flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span className="font-semibold">Errore</span>
+              </div>
+              <span className="text-[10px] leading-tight font-medium">{error}</span>
             </div>
           )}
           

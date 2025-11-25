@@ -297,6 +297,8 @@ export interface WeighInAthlete {
   birth_date: string;
   weight_category: string;
   weight_cat_id: number;
+  min_kg: number;  // Peso minimo categoria
+  max_kg: number | null;  // Peso massimo categoria (null = open)
   // Weigh-in data
   weight_in_info_id: number | null;
   bodyweight_kg: number | null;
