@@ -208,16 +208,21 @@ export default function DirectorPage() {
         const weightA = nextAttemptA?.weight_kg;
         const weightB = nextAttemptB?.weight_kg;
         
-        // Both have next attempt weights
-        if (weightA !== null && weightA !== undefined && weightB !== null && weightB !== undefined) {
+        // Check if weights are actually set (not null/undefined)
+        const aHasWeight = weightA !== null && weightA !== undefined;
+        const bHasWeight = weightB !== null && weightB !== undefined;
+        
+        // Both have next attempt weights - sort by weight
+        if (aHasWeight && bHasWeight) {
           if (weightA !== weightB) return weightA - weightB;
           return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
         }
-        // A has weight, B doesn't
-        if (weightA !== null && weightA !== undefined) return -1;
-        if (weightB !== null && weightB !== undefined) return 1;
-        // Neither has next weight - keep by bodyweight
-        return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
+        // Only A has weight → A comes first
+        if (aHasWeight && !bHasWeight) return -1;
+        // Only B has weight → B comes first
+        if (!aHasWeight && bHasWeight) return 1;
+        // Neither has next weight - DO NOT REORDER, keep original position
+        return 0;
       }
       
       // Case 2: A completed, B hasn't → A comes FIRST (already done)

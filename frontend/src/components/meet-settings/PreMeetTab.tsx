@@ -187,7 +187,7 @@ export default function PreMeetTab({ meetId }: PreMeetTabProps) {
           <select
             value={selectedFlightId || ''}
             onChange={(e) => setSelectedFlightId(e.target.value ? parseInt(e.target.value) : null)}
-            className={`input-field ${isLoading || flights.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`input-field ${isLoading || flights.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer'} enabled:opacity-100 enabled:cursor-pointer enabled:pointer-events-auto`}
             disabled={isLoading || flights.length === 0}
           >
             <option value="">
