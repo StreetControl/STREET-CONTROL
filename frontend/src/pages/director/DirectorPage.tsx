@@ -140,7 +140,10 @@ export default function DirectorPage() {
       const response = await getGroupAthletes(selectedGroupId, selectedLiftId);
 
       if (response.success) {
-        setAthletes(response.athletes);
+        const currentRoundNo = response.currentState?.current_round || 1;
+        // Apply hybrid sorting after loading
+        const sortedAthletes = sortAthletesHybrid(response.athletes, currentRoundNo);
+        setAthletes(sortedAthletes);
         setCurrentState(response.currentState || null);
       } else {
         setError(response.error || 'Errore nel caricamento degli atleti');
@@ -178,10 +181,126 @@ export default function DirectorPage() {
     setSelectedLiftId(liftId);
   };
 
-  const handleAttemptUpdate = useCallback(() => {
-    // Reload athletes after any attempt update
-    loadAthletes();
-  }, [selectedGroupId, selectedLiftId]);
+  /**
+   * Sort athletes with hybrid logic:
+   * - Athletes who COMPLETED current round: sorted by NEXT attempt weight
+   * - Athletes who have NOT completed current round: sorted by CURRENT attempt weight
+   * 
+   * @param athleteList - List of athletes
+   * @param currentRoundNo - The current round number (1, 2, or 3)
+   */
+  const sortAthletesHybrid = useCallback((athleteList: Athlete[], currentRoundNo: number): Athlete[] => {
+    return [...athleteList].sort((a, b) => {
+      const currentAttemptKey = `attempt${currentRoundNo}` as 'attempt1' | 'attempt2' | 'attempt3';
+      const nextAttemptKey = `attempt${currentRoundNo + 1}` as 'attempt1' | 'attempt2' | 'attempt3';
+      
+      const currentAttemptA = a[currentAttemptKey];
+      const currentAttemptB = b[currentAttemptKey];
+      
+      // Check if athletes have completed current round (status is VALID or INVALID)
+      const aCompletedCurrent = currentAttemptA && currentAttemptA.status !== 'PENDING';
+      const bCompletedCurrent = currentAttemptB && currentAttemptB.status !== 'PENDING';
+      
+      // Case 1: Both completed current round → sort by NEXT attempt weight
+      if (aCompletedCurrent && bCompletedCurrent) {
+        const nextAttemptA = a[nextAttemptKey];
+        const nextAttemptB = b[nextAttemptKey];
+        const weightA = nextAttemptA?.weight_kg;
+        const weightB = nextAttemptB?.weight_kg;
+        
+        // Both have next attempt weights
+        if (weightA !== null && weightA !== undefined && weightB !== null && weightB !== undefined) {
+          if (weightA !== weightB) return weightA - weightB;
+          return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
+        }
+        // A has weight, B doesn't
+        if (weightA !== null && weightA !== undefined) return -1;
+        if (weightB !== null && weightB !== undefined) return 1;
+        // Neither has next weight - keep by bodyweight
+        return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
+      }
+      
+      // Case 2: A completed, B hasn't → A comes FIRST (already done)
+      if (aCompletedCurrent && !bCompletedCurrent) return -1;
+      
+      // Case 3: B completed, A hasn't → B comes FIRST
+      if (!aCompletedCurrent && bCompletedCurrent) return 1;
+      
+      // Case 4: Neither completed → sort by CURRENT attempt weight
+      const weightA = currentAttemptA?.weight_kg;
+      const weightB = currentAttemptB?.weight_kg;
+      
+      if (weightA !== null && weightA !== undefined && weightB !== null && weightB !== undefined) {
+        if (weightA !== weightB) return weightA - weightB;
+        return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
+      }
+      if (weightA !== null && weightA !== undefined) return -1;
+      if (weightB !== null && weightB !== undefined) return 1;
+      return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
+    });
+  }, []);
+
+  /**
+   * Load athletes without showing loading spinner (background refresh)
+   */
+  const loadAthletesQuiet = useCallback(async () => {
+    if (!selectedGroupId || !selectedLiftId) return;
+
+    try {
+      const response = await getGroupAthletes(selectedGroupId, selectedLiftId);
+      if (response.success) {
+        const currentRoundNo = response.currentState?.current_round || 1;
+        // Apply hybrid sorting after loading
+        const sortedAthletes = sortAthletesHybrid(response.athletes, currentRoundNo);
+        setAthletes(sortedAthletes);
+        setCurrentState(response.currentState || null);
+      }
+    } catch (err: any) {
+      console.error('Error loading athletes:', err);
+    }
+  }, [selectedGroupId, selectedLiftId, sortAthletesHybrid]);
+
+  /**
+   * Handle attempt updates - optimized to avoid full page reload
+   * @param attemptNo - If provided, triggers reordering for that attempt's weights
+   * @param weightInInfoId - The athlete's weight_in_info_id whose weight changed
+   * @param newWeight - The new weight value
+   */
+  const handleAttemptUpdate = useCallback((attemptNo?: number, weightInInfoId?: number, newWeight?: number) => {
+    // If attemptNo is provided, it means a weight was entered for that attempt
+    // We need to do optimistic update and re-sort
+    if (attemptNo && weightInInfoId !== undefined && newWeight !== undefined) {
+      const currentRoundNo = currentState?.current_round || 1;
+      
+      setAthletes(prev => {
+        // First, optimistically update the athlete's attempt weight
+        const updated = prev.map(athlete => {
+          if (athlete.weight_in_info_id === weightInInfoId) {
+            const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
+            const existingAttempt = athlete[attemptKey];
+            return {
+              ...athlete,
+              [attemptKey]: existingAttempt 
+                ? { ...existingAttempt, weight_kg: newWeight }
+                : { id: -1, weight_kg: newWeight, status: 'PENDING' } // temp id
+            };
+          }
+          return athlete;
+        });
+        
+        // Use hybrid sorting based on current round
+        // This will sort athletes who completed current round by their NEXT attempt weight
+        // and athletes who haven't completed by their CURRENT attempt weight
+        return sortAthletesHybrid(updated, currentRoundNo);
+      });
+      // DON'T reload from backend - it would overwrite our local sort
+      return;
+    }
+    
+    // For other updates (like toggling status without attemptNo), 
+    // just reload fresh data in background
+    loadAthletesQuiet();
+  }, [currentState?.current_round, sortAthletesHybrid, loadAthletesQuiet]);
 
   // Advance to next athlete after judgment
   const advanceToNextAthlete = async () => {
@@ -191,8 +310,8 @@ export default function DirectorPage() {
       const response = await advanceAthlete(selectedGroupId, selectedLiftId);
       if (response.success) {
         setCurrentState(response.currentState);
-        // Reload athletes to get fresh data after judgment
-        loadAthletes();
+        // Background refresh to get updated data
+        loadAthletesQuiet();
       }
     } catch (error: any) {
       console.error('Error advancing athlete:', error);

@@ -31,7 +31,7 @@ interface AthleteTableProps {
   currentAthleteIndex: number;
   currentRound: number;
   selectedLiftId: string;
-  onAttemptUpdate: () => void;
+  onAttemptUpdate: (attemptNo?: number, weightInInfoId?: number, newWeight?: number) => void;
 }
 
 export default function AthleteTable({

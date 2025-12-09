@@ -39,7 +39,7 @@ interface AthleteRowProps {
   isCurrentAthlete: boolean;
   currentRound: number;
   selectedLiftId: string;
-  onAttemptUpdate: () => void;
+  onAttemptUpdate: (attemptNo?: number, weightInInfoId?: number, newWeight?: number) => void;
 }
 
 export default function AthleteRow({
@@ -61,7 +61,7 @@ export default function AthleteRow({
 
   // Handle weight entry (create attempt if not exists, update if exists)
   const handleWeightEntry = async (attemptNo: number, weightStr: string) => {
-    const weight = parseFloat(weightStr);
+    const weight = parseFloat(weightStr.replace(',', '.')); // Support both . and , as decimal separator
     
     if (isNaN(weight) || weight < 0) {
       return; // Silent fail for invalid input
@@ -85,7 +85,8 @@ export default function AthleteRow({
       }
       // If attempt is already judged (VALID/INVALID), don't allow weight change via input
 
-      onAttemptUpdate();
+      // Pass weight and attemptNo to trigger optimistic update and reordering
+      onAttemptUpdate(attemptNo, athlete.weight_in_info_id, weight);
     } catch (error: any) {
       console.error('Error saving weight:', error);
     }
@@ -103,6 +104,7 @@ export default function AthleteRow({
     try {
       setTogglingAttempt(attemptNo);
       await updateAttemptDirector(attempt.id, { status: newStatus });
+      // Don't trigger full reload, just local update
       onAttemptUpdate();
     } catch (error: any) {
       console.error('Error toggling status:', error);
@@ -161,11 +163,12 @@ export default function AthleteRow({
       return (
         <td className={`px-4 py-3 text-center ${bgColor}`}>
           <input
-            type="number"
-            step="0.5"
+            type="text"
+            inputMode="decimal"
             defaultValue={attempt.weight_kg || ''}
             onBlur={(e) => {
-              const newWeight = parseFloat(e.target.value);
+              const val = e.target.value.replace(',', '.');
+              const newWeight = parseFloat(val);
               if (!isNaN(newWeight) && newWeight !== attempt.weight_kg) {
                 handleWeightEntry(attemptNo, e.target.value);
               }
@@ -186,8 +189,8 @@ export default function AthleteRow({
       return (
         <td className={`px-4 py-3 text-center ${bgColor}`}>
           <input
-            type="number"
-            step="0.5"
+            type="text"
+            inputMode="decimal"
             placeholder="--"
             onBlur={(e) => {
               if (e.target.value) {
