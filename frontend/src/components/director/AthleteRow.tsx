@@ -59,12 +59,27 @@ export default function AthleteRow({
     return 'bg-dark-bg-secondary';
   };
 
+  // Get the weight of the previous attempt (for validation)
+  const getPreviousAttemptWeight = (attemptNo: number): number | null => {
+    if (attemptNo === 1) return null; // No previous attempt for first
+    const prevAttemptKey = `attempt${attemptNo - 1}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const prevAttempt = athlete[prevAttemptKey];
+    return prevAttempt?.weight_kg ?? null;
+  };
+
   // Handle weight entry (create attempt if not exists, update if exists)
   const handleWeightEntry = async (attemptNo: number, weightStr: string) => {
     const weight = parseFloat(weightStr.replace(',', '.')); // Support both . and , as decimal separator
     
     if (isNaN(weight) || weight < 0) {
       return; // Silent fail for invalid input
+    }
+
+    // Validation: weight must be >= previous attempt weight
+    const prevWeight = getPreviousAttemptWeight(attemptNo);
+    if (prevWeight !== null && weight < prevWeight) {
+      alert(`Il peso deve essere >= ${prevWeight} kg (peso della prova precedente)`);
+      return;
     }
 
     try {
@@ -165,7 +180,7 @@ export default function AthleteRow({
           <input
             type="text"
             inputMode="decimal"
-            defaultValue={attempt.weight_kg || ''}
+            defaultValue={attempt.weight_kg !== null && attempt.weight_kg !== undefined ? attempt.weight_kg : ''}
             onBlur={(e) => {
               const val = e.target.value.replace(',', '.');
               const newWeight = parseFloat(val);

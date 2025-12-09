@@ -59,13 +59,13 @@ export default function AthleteTable({
                 <th className="px-3 py-3 text-center text-xs font-bold text-dark-text-secondary uppercase tracking-wider w-24">
                   BW
                 </th>
-                <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider border-l-2 border-dark-border w-40 ${currentRound === 1 ? 'text-cyan-400 bg-cyan-950/30' : 'text-dark-text-secondary'}`}>
+                <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider border-l-2 border-dark-border w-40 ${currentRound === 1 ? 'text-cyan-400 bg-cyan-950/30 border-t-4 border-t-cyan-500' : 'text-dark-text-secondary'}`}>
                   PROVA 1
                 </th>
-                <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-40 ${currentRound === 2 ? 'text-cyan-400 bg-cyan-950/30' : 'text-dark-text-secondary'}`}>
+                <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-40 ${currentRound === 2 ? 'text-cyan-400 bg-cyan-950/30 border-t-4 border-t-cyan-500' : 'text-dark-text-secondary'}`}>
                   PROVA 2
                 </th>
-                <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-40 ${currentRound === 3 ? 'text-cyan-400 bg-cyan-950/30' : 'text-dark-text-secondary'}`}>
+                <th className={`px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-40 ${currentRound === 3 ? 'text-cyan-400 bg-cyan-950/30 border-t-4 border-t-cyan-500' : 'text-dark-text-secondary'}`}>
                   PROVA 3
                 </th>
               </tr>

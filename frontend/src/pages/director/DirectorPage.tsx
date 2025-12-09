@@ -329,7 +329,7 @@ export default function DirectorPage() {
     const attemptKey = `attempt${currentRound}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attempt = currentAthlete[attemptKey];
 
-    if (!attempt || !attempt.weight_kg) {
+    if (!attempt || attempt.weight_kg === null || attempt.weight_kg === undefined) {
       alert('Impossibile validare: peso non inserito');
       return;
     }
@@ -357,7 +357,7 @@ export default function DirectorPage() {
     const attemptKey = `attempt${currentRound}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attempt = currentAthlete[attemptKey];
 
-    if (!attempt || !attempt.weight_kg) {
+    if (!attempt || attempt.weight_kg === null || attempt.weight_kg === undefined) {
       alert('Impossibile invalidare: peso non inserito');
       return;
     }
