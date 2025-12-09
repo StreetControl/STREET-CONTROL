@@ -1,10 +1,17 @@
 /**
  * ATHLETE ROW
  * Displays a single athlete with attempts, handles weight input and status display
+ * 
+ * Updated:
+ * - Softened red/green colors (bg-green-700/80, bg-red-700/80)
+ * - Small toggle button in judged cells to flip VALID↔INVALID (doesn't move cursor)
+ * - Can always enter weight for next attempt after current one is judged
+ * - Cursor movement is independent from editing judged cells
  */
 
 import { useState } from 'react';
 import { updateAttemptDirector, createNextAttempt } from '../../services/api';
+import { RefreshCw } from 'lucide-react';
 
 interface Attempt {
   id: number;
@@ -21,15 +28,16 @@ interface Athlete {
   sex: string;
   weight_category: string;
   bodyweight_kg: number;
+  notes?: string;
   attempt1: Attempt | null;
   attempt2: Attempt | null;
   attempt3: Attempt | null;
-  current_attempt_no: number;
 }
 
 interface AthleteRowProps {
   athlete: Athlete;
   isCurrentAthlete: boolean;
+  currentRound: number;
   selectedLiftId: string;
   onAttemptUpdate: () => void;
 }
@@ -37,26 +45,26 @@ interface AthleteRowProps {
 export default function AthleteRow({
   athlete,
   isCurrentAthlete,
+  currentRound,
   selectedLiftId,
   onAttemptUpdate
 }: AthleteRowProps) {
-  const [editingWeight, setEditingWeight] = useState<string>('');
+  const [togglingAttempt, setTogglingAttempt] = useState<number | null>(null);
 
-  // Get cell background color based on attempt status
+  // Get cell background color based on attempt status (softened colors)
   const getCellColor = (attempt: Attempt | null): string => {
     if (!attempt) return 'bg-dark-bg-secondary';
-    if (attempt.status === 'VALID') return 'bg-green-600';
-    if (attempt.status === 'INVALID') return 'bg-red-600';
+    if (attempt.status === 'VALID') return 'bg-green-700/80';
+    if (attempt.status === 'INVALID') return 'bg-red-700/80';
     return 'bg-dark-bg-secondary';
   };
 
-  // Handle weight entry (create attempt if not exists, update if exists without status)
+  // Handle weight entry (create attempt if not exists, update if exists)
   const handleWeightEntry = async (attemptNo: number, weightStr: string) => {
     const weight = parseFloat(weightStr);
     
-    if (isNaN(weight) || weight <= 0) {
-      alert('Inserisci un peso valido');
-      return;
+    if (isNaN(weight) || weight < 0) {
+      return; // Silent fail for invalid input
     }
 
     try {
@@ -71,23 +79,47 @@ export default function AthleteRow({
           weight_in_info_id: athlete.weight_in_info_id,
           attempt_no: attemptNo
         });
-      } else if (!existingAttempt.status) {
-        // Update existing attempt without status
+      } else if (existingAttempt.status === 'PENDING') {
+        // Update existing PENDING attempt weight only
         await updateAttemptDirector(existingAttempt.id, { weight_kg: weight });
-      } else {
-        // Attempt already has status, cannot modify
-        alert('Impossibile modificare: tentativo già valutato');
-        return;
       }
+      // If attempt is already judged (VALID/INVALID), don't allow weight change via input
 
-      // Clear input and reload data
-      setEditingWeight('');
       onAttemptUpdate();
-
     } catch (error: any) {
       console.error('Error saving weight:', error);
-      alert('Errore durante il salvataggio del peso');
     }
+  };
+
+  // Toggle VALID ↔ INVALID for already judged attempts (doesn't affect cursor)
+  const handleToggleStatus = async (attemptNo: number) => {
+    const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const attempt = athlete[attemptKey];
+    
+    if (!attempt || attempt.status === 'PENDING') return;
+
+    const newStatus = attempt.status === 'VALID' ? 'INVALID' : 'VALID';
+
+    try {
+      setTogglingAttempt(attemptNo);
+      await updateAttemptDirector(attempt.id, { status: newStatus });
+      onAttemptUpdate();
+    } catch (error: any) {
+      console.error('Error toggling status:', error);
+    } finally {
+      setTogglingAttempt(null);
+    }
+  };
+
+  // Check if previous attempt is completed (for enabling next attempt input)
+  const isPreviousAttemptCompleted = (attemptNo: number): boolean => {
+    if (attemptNo === 1) return true; // First attempt is always available
+    
+    const prevAttemptKey = `attempt${attemptNo - 1}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const prevAttempt = athlete[prevAttemptKey];
+    
+    // Previous attempt must exist and be judged (not PENDING)
+    return prevAttempt !== null && prevAttempt.status !== 'PENDING';
   };
 
   // Render a single attempt cell
@@ -95,26 +127,46 @@ export default function AthleteRow({
     const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attempt = athlete[attemptKey];
     const bgColor = getCellColor(attempt);
+    const isToggling = togglingAttempt === attemptNo;
 
-    // If attempt exists and has status, show weight with color
-    if (attempt && attempt.status) {
+    // If attempt exists and has been judged (VALID or INVALID)
+    if (attempt && attempt.status && attempt.status !== 'PENDING') {
       return (
-        <td className={`px-4 py-3 text-center font-bold text-white ${bgColor}`}>
-          {attempt.weight_kg} kg
+        <td className={`px-4 py-3 text-center font-bold text-white ${bgColor} relative group`}>
+          <div className="flex items-center justify-center gap-2">
+            <span>{attempt.weight_kg} kg</span>
+            {/* Toggle button - appears on hover or during toggle */}
+            <button
+              onClick={() => handleToggleStatus(attemptNo)}
+              disabled={isToggling}
+              className={`
+                p-1 rounded transition-all
+                ${isToggling 
+                  ? 'opacity-100' 
+                  : 'opacity-0 group-hover:opacity-100'
+                }
+                hover:bg-white/20
+              `}
+              title={`Cambia in ${attempt.status === 'VALID' ? 'NON VALIDA' : 'VALIDA'}`}
+            >
+              <RefreshCw className={`w-4 h-4 ${isToggling ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </td>
       );
     }
 
-    // If attempt exists but no status, show editable weight
-    if (attempt && !attempt.status) {
+    // If attempt exists but is PENDING, show editable weight
+    if (attempt && attempt.status === 'PENDING') {
       return (
         <td className={`px-4 py-3 text-center ${bgColor}`}>
           <input
             type="number"
             step="0.5"
-            defaultValue={attempt.weight_kg}
+            defaultValue={attempt.weight_kg || ''}
             onBlur={(e) => {
-              if (e.target.value && parseFloat(e.target.value) !== attempt.weight_kg) {
+              const newWeight = parseFloat(e.target.value);
+              if (!isNaN(newWeight) && newWeight !== attempt.weight_kg) {
                 handleWeightEntry(attemptNo, e.target.value);
               }
             }}
@@ -129,19 +181,17 @@ export default function AthleteRow({
       );
     }
 
-    // No attempt yet - show input field if it's the current attempt
-    if (attemptNo === athlete.current_attempt_no) {
+    // No attempt yet - show input field if previous attempt is completed
+    if (isPreviousAttemptCompleted(attemptNo)) {
       return (
         <td className={`px-4 py-3 text-center ${bgColor}`}>
           <input
             type="number"
             step="0.5"
             placeholder="--"
-            value={editingWeight}
-            onChange={(e) => setEditingWeight(e.target.value)}
-            onBlur={() => {
-              if (editingWeight) {
-                handleWeightEntry(attemptNo, editingWeight);
+            onBlur={(e) => {
+              if (e.target.value) {
+                handleWeightEntry(attemptNo, e.target.value);
               }
             }}
             onKeyDown={(e) => {
@@ -155,7 +205,7 @@ export default function AthleteRow({
       );
     }
 
-    // Future attempt - show placeholder
+    // Future attempt - show placeholder (previous not completed)
     return (
       <td className={`px-4 py-3 text-center text-dark-text-secondary ${bgColor}`}>
         --

@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDirectorState, getGroupAthletes, updateAttemptDirector } from '../../services/api';
+import { getDirectorState, getGroupAthletes, updateAttemptDirector, advanceAthlete } from '../../services/api';
 import { ChevronLeft } from 'lucide-react';
 import { DirectorHeader, AthleteTable } from '../../components/director';
 
@@ -39,16 +39,23 @@ interface Athlete {
   sex: string;
   weight_category: string;
   bodyweight_kg: number;
+  notes?: string;
   attempt1: { id: number; weight_kg: number; status: string } | null;
   attempt2: { id: number; weight_kg: number; status: string } | null;
   attempt3: { id: number; weight_kg: number; status: string } | null;
-  current_attempt_no: number;
+}
+
+interface CurrentState {
+  current_round: number;
+  current_weight_in_info_id: number | null;
+  completed: boolean;
 }
 
 export default function DirectorPage() {
   const { meetId } = useParams<{ meetId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  // Note: useAuth() available for future auth-based features
+  useAuth();
 
   const [meetName, setMeetName] = useState<string>('');
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -59,12 +66,17 @@ export default function DirectorPage() {
   const [selectedLiftId, setSelectedLiftId] = useState<string | null>(null);
   
   const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [currentAthleteIndex, setCurrentAthleteIndex] = useState<number>(0);
+  const [currentState, setCurrentState] = useState<CurrentState | null>(null);
   
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingAthletes, setLoadingAthletes] = useState<boolean>(false);
   const [updating, setUpdating] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+
+  // Determine current athlete index from currentState
+  const currentAthleteIndex = currentState?.current_weight_in_info_id
+    ? athletes.findIndex(a => a.weight_in_info_id === currentState.current_weight_in_info_id)
+    : 0;
 
   // Load initial state
   useEffect(() => {
@@ -114,7 +126,7 @@ export default function DirectorPage() {
       loadAthletes();
     } else {
       setAthletes([]);
-      setCurrentAthleteIndex(0);
+      setCurrentState(null);
     }
   }, [selectedGroupId, selectedLiftId]);
 
@@ -129,15 +141,17 @@ export default function DirectorPage() {
 
       if (response.success) {
         setAthletes(response.athletes);
-        setCurrentAthleteIndex(0); // Reset to first athlete
+        setCurrentState(response.currentState || null);
       } else {
         setError(response.error || 'Errore nel caricamento degli atleti');
         setAthletes([]);
+        setCurrentState(null);
       }
     } catch (err: any) {
       console.error('Error loading athletes:', err);
       setError('Errore di connessione al server');
       setAthletes([]);
+      setCurrentState(null);
     } finally {
       setLoadingAthletes(false);
     }
@@ -169,19 +183,31 @@ export default function DirectorPage() {
     loadAthletes();
   }, [selectedGroupId, selectedLiftId]);
 
-  const handleAdvanceAthlete = useCallback(() => {
-    // Move to next athlete (used after marking valid/invalid)
-    if (currentAthleteIndex < athletes.length - 1) {
-      setCurrentAthleteIndex(prev => prev + 1);
+  // Advance to next athlete after judgment
+  const advanceToNextAthlete = async () => {
+    if (!selectedGroupId || !selectedLiftId) return;
+    
+    try {
+      const response = await advanceAthlete(selectedGroupId, selectedLiftId);
+      if (response.success) {
+        setCurrentState(response.currentState);
+        // Reload athletes to get fresh data after judgment
+        loadAthletes();
+      }
+    } catch (error: any) {
+      console.error('Error advancing athlete:', error);
     }
-  }, [currentAthleteIndex, athletes.length]);
+  };
 
   // Mark current attempt as VALID
   const handleMarkValid = async () => {
+    if (currentAthleteIndex < 0 || currentAthleteIndex >= athletes.length || updating) return;
     const currentAthlete = athletes[currentAthleteIndex];
-    if (!currentAthlete || updating) return;
+    if (!currentAthlete) return;
 
-    const attemptKey = `attempt${currentAthlete.current_attempt_no}` as 'attempt1' | 'attempt2' | 'attempt3';
+    // Get current round from state
+    const currentRound = currentState?.current_round || 1;
+    const attemptKey = `attempt${currentRound}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attempt = currentAthlete[attemptKey];
 
     if (!attempt || !attempt.weight_kg) {
@@ -192,24 +218,24 @@ export default function DirectorPage() {
     try {
       setUpdating(true);
       await updateAttemptDirector(attempt.id, { status: 'VALID' });
-      handleAttemptUpdate();
-      setTimeout(() => {
-        handleAdvanceAthlete();
-        setUpdating(false);
-      }, 300);
+      await advanceToNextAthlete();
     } catch (error: any) {
       console.error('Error marking valid:', error);
       alert('Errore durante l\'aggiornamento');
+    } finally {
       setUpdating(false);
     }
   };
 
   // Mark current attempt as INVALID
   const handleMarkInvalid = async () => {
+    if (currentAthleteIndex < 0 || currentAthleteIndex >= athletes.length || updating) return;
     const currentAthlete = athletes[currentAthleteIndex];
-    if (!currentAthlete || updating) return;
+    if (!currentAthlete) return;
 
-    const attemptKey = `attempt${currentAthlete.current_attempt_no}` as 'attempt1' | 'attempt2' | 'attempt3';
+    // Get current round from state
+    const currentRound = currentState?.current_round || 1;
+    const attemptKey = `attempt${currentRound}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attempt = currentAthlete[attemptKey];
 
     if (!attempt || !attempt.weight_kg) {
@@ -220,14 +246,11 @@ export default function DirectorPage() {
     try {
       setUpdating(true);
       await updateAttemptDirector(attempt.id, { status: 'INVALID' });
-      handleAttemptUpdate();
-      setTimeout(() => {
-        handleAdvanceAthlete();
-        setUpdating(false);
-      }, 300);
+      await advanceToNextAthlete();
     } catch (error: any) {
       console.error('Error marking invalid:', error);
       alert('Errore durante l\'aggiornamento');
+    } finally {
       setUpdating(false);
     }
   };
@@ -312,7 +335,8 @@ export default function DirectorPage() {
         ) : (
           <AthleteTable
             athletes={athletes}
-            currentAthleteIndex={currentAthleteIndex}
+            currentAthleteIndex={currentAthleteIndex >= 0 ? currentAthleteIndex : 0}
+            currentRound={currentState?.current_round || 1}
             selectedLiftId={selectedLiftId!}
             onAttemptUpdate={handleAttemptUpdate}
           />

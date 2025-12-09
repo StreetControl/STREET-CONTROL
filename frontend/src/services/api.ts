@@ -370,12 +370,21 @@ export async function updateAttemptDirector(attemptId: number, data: {
  * Create next attempt (2 or 3)
  */
 export async function createNextAttempt(data: {
-  weight_kg: number;
+  weight_kg?: number;
   lift_id: string;
   weight_in_info_id: number;
   attempt_no: number;
 }): Promise<any> {
   const response = await api.post('/director/attempts', data);
+  return response.data;
+}
+
+/**
+ * Advance to next athlete after judgment
+ * Returns updated currentState with next athlete info
+ */
+export async function advanceAthlete(groupId: number, liftId: string): Promise<any> {
+  const response = await api.post('/director/advance', { groupId, liftId });
   return response.data;
 }
 

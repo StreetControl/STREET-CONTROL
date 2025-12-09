@@ -8,7 +8,8 @@ import {
   getDirectorState, 
   getGroupAthletes,
   updateAttempt,
-  createNextAttempt 
+  createNextAttempt,
+  advanceToNextAthlete
 } from '../controllers/directorController.js';
 import { verifyToken } from '../middleware/verifyToken.js';
 
@@ -43,5 +44,12 @@ router.patch('/attempts/:attemptId', updateAttempt);
  * Body: { weight_kg, lift_id, weight_in_info_id, attempt_no }
  */
 router.post('/attempts', createNextAttempt);
+
+/**
+ * POST /api/director/advance
+ * Advance to next athlete after judgment
+ * Body: { groupId, liftId }
+ */
+router.post('/advance', advanceToNextAthlete);
 
 export default router;

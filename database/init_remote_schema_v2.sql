@@ -255,19 +255,22 @@ CREATE TABLE attempts (
   FOREIGN KEY (lift_id) REFERENCES lifts(id)
 );
 
+-- Tabella per tracciare lo stato corrente per ogni combinazione group+lift
+-- NON è un singleton: una riga per ogni (group_id, lift_id)
+-- Permette di riprendere ogni alzata dal punto in cui ci si è fermati
 CREATE TABLE current_state (
-  id                        SERIAL PRIMARY KEY CHECK (id = 1), -- singleton: solo 1 riga
-  meet_id                   INTEGER,
-  current_flight_id         INTEGER,
-  current_group_id          INTEGER,
-  current_lift_id           TEXT,
-  current_round             INTEGER CHECK (current_round BETWEEN 1 AND 3),
-  current_weight_in_info_id INTEGER, -- atleta corrente in pedana
-  FOREIGN KEY (meet_id)                   REFERENCES meets(id),
-  FOREIGN KEY (current_flight_id)         REFERENCES flights(id),
-  FOREIGN KEY (current_group_id)          REFERENCES groups(id),
-  FOREIGN KEY (current_weight_in_info_id) REFERENCES weight_in_info(id) ON DELETE SET NULL,
-  FOREIGN KEY (current_lift_id)           REFERENCES lifts(id)
+  id                        SERIAL PRIMARY KEY,
+  group_id                  INTEGER NOT NULL,
+  lift_id                   VARCHAR(5) NOT NULL,
+  current_attempt_no        INTEGER NOT NULL DEFAULT 1 CHECK (current_attempt_no BETWEEN 1 AND 3),
+  current_weight_in_info_id INTEGER, -- atleta corrente in pedana (NULL = non ancora iniziato o completato)
+  completed                 BOOLEAN NOT NULL DEFAULT FALSE, -- TRUE quando tutti gli atleti hanno completato le 3 prove
+  created_at                TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (group_id, lift_id),
+  FOREIGN KEY (group_id)                  REFERENCES groups(id) ON DELETE CASCADE,
+  FOREIGN KEY (lift_id)                   REFERENCES lifts(id) ON DELETE RESTRICT,
+  FOREIGN KEY (current_weight_in_info_id) REFERENCES weight_in_info(id) ON DELETE SET NULL
 );
 
 /* ---------------------------
@@ -325,10 +328,9 @@ CREATE TABLE result_lifts (
 ============================================ */
 
 -- Indici per current_state (query molto frequenti durante la gara)
-CREATE INDEX idx_current_state_meet ON current_state(meet_id);
-CREATE INDEX idx_current_state_flight ON current_state(current_flight_id);
-CREATE INDEX idx_current_state_group ON current_state(current_group_id);
-CREATE INDEX idx_current_state_lift ON current_state(current_lift_id);
+CREATE INDEX idx_current_state_group ON current_state(group_id);
+CREATE INDEX idx_current_state_lift ON current_state(lift_id);
+CREATE INDEX idx_current_state_group_lift ON current_state(group_id, lift_id);
 CREATE INDEX idx_current_state_athlete ON current_state(current_weight_in_info_id);
 
 -- Indici per attempts (query costanti durante la gara)
