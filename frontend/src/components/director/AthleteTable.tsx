@@ -76,7 +76,6 @@ export default function AthleteTable({
                   key={athlete.nomination_id}
                   athlete={athlete}
                   isCurrentAthlete={index === currentAthleteIndex}
-                  currentRound={currentRound}
                   selectedLiftId={selectedLiftId}
                   onAttemptUpdate={onAttemptUpdate}
                 />

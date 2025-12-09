@@ -1,15 +1,9 @@
 /**
  * ATHLETE ROW
- * Displays a single athlete with attempts, handles weight input and status display
- * 
- * Updated:
- * - Softened red/green colors (bg-green-700/80, bg-red-700/80)
- * - Small toggle button in judged cells to flip VALID↔INVALID (doesn't move cursor)
- * - Can always enter weight for next attempt after current one is judged
- * - Cursor movement is independent from editing judged cells
+ * Displays a single athlete with attempts, handles weight input and status toggle
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { updateAttemptDirector, createNextAttempt } from '../../services/api';
 import { RefreshCw } from 'lucide-react';
 
@@ -37,7 +31,6 @@ interface Athlete {
 interface AthleteRowProps {
   athlete: Athlete;
   isCurrentAthlete: boolean;
-  currentRound: number;
   selectedLiftId: string;
   onAttemptUpdate: (attemptNo?: number, weightInInfoId?: number, newWeight?: number) => void;
 }
@@ -45,11 +38,16 @@ interface AthleteRowProps {
 export default function AthleteRow({
   athlete,
   isCurrentAthlete,
-  currentRound,
   selectedLiftId,
   onAttemptUpdate
 }: AthleteRowProps) {
   const [togglingAttempt, setTogglingAttempt] = useState<number | null>(null);
+  
+  // Local state for input values - allows immediate UI feedback
+  const [localWeights, setLocalWeights] = useState<Record<number, string>>({});
+  
+  // Track which attempts are currently being processed to prevent double-firing
+  const processingRef = useRef<Set<number>>(new Set());
 
   // Get cell background color based on attempt status (softened colors)
   const getCellColor = (attempt: Attempt | null): string => {
@@ -59,52 +57,102 @@ export default function AthleteRow({
     return 'bg-dark-bg-secondary';
   };
 
-  // Get the weight of the previous attempt (for validation)
-  const getPreviousAttemptWeight = (attemptNo: number): number | null => {
-    if (attemptNo === 1) return null; // No previous attempt for first
+  // Get the previous attempt info (weight and status) for validation
+  const getPreviousAttemptInfo = (attemptNo: number): { weight: number | null; status: string | null } => {
+    if (attemptNo === 1) return { weight: null, status: null }; // No previous attempt for first
     const prevAttemptKey = `attempt${attemptNo - 1}` as 'attempt1' | 'attempt2' | 'attempt3';
     const prevAttempt = athlete[prevAttemptKey];
-    return prevAttempt?.weight_kg ?? null;
+    return {
+      weight: prevAttempt?.weight_kg ?? null,
+      status: prevAttempt?.status ?? null
+    };
   };
 
   // Handle weight entry (create attempt if not exists, update if exists)
   const handleWeightEntry = async (attemptNo: number, weightStr: string) => {
+    // Prevent double-firing (can happen when input is destroyed during re-render)
+    if (processingRef.current.has(attemptNo)) {
+      return;
+    }
+    
     const weight = parseFloat(weightStr.replace(',', '.')); // Support both . and , as decimal separator
     
     if (isNaN(weight) || weight < 0) {
       return; // Silent fail for invalid input
     }
 
-    // Validation: weight must be >= previous attempt weight
-    const prevWeight = getPreviousAttemptWeight(attemptNo);
-    if (prevWeight !== null && weight < prevWeight) {
-      alert(`Il peso deve essere >= ${prevWeight} kg (peso della prova precedente)`);
-      return;
-    }
-
-    try {
-      const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
-      const existingAttempt = athlete[attemptKey];
-
-      if (!existingAttempt) {
-        // Create new attempt
-        await createNextAttempt({
-          weight_kg: weight,
-          lift_id: selectedLiftId,
-          weight_in_info_id: athlete.weight_in_info_id,
-          attempt_no: attemptNo
-        });
-      } else if (existingAttempt.status === 'PENDING') {
-        // Update existing PENDING attempt weight only
-        await updateAttemptDirector(existingAttempt.id, { weight_kg: weight });
+    // Validation: weight must be > previous if VALID, >= if INVALID
+    const prevInfo = getPreviousAttemptInfo(attemptNo);
+    if (prevInfo.weight !== null) {
+      if (prevInfo.status === 'VALID') {
+        // Previous was VALID: new weight must be strictly greater
+        if (weight <= prevInfo.weight) {
+          alert(`Il peso deve essere > ${prevInfo.weight} kg (la prova precedente era VALIDA)`);
+          return;
+        }
+      } else {
+        // Previous was INVALID: new weight must be >= (can repeat same weight)
+        if (weight < prevInfo.weight) {
+          alert(`Il peso deve essere >= ${prevInfo.weight} kg (peso della prova precedente)`);
+          return;
+        }
       }
-      // If attempt is already judged (VALID/INVALID), don't allow weight change via input
-
-      // Pass weight and attemptNo to trigger optimistic update and reordering
-      onAttemptUpdate(attemptNo, athlete.weight_in_info_id, weight);
-    } catch (error: any) {
-      console.error('Error saving weight:', error);
     }
+
+    const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const existingAttempt = athlete[attemptKey];
+    
+    // Save weight_in_info_id before async call (closure might be stale after await)
+    const athleteWeightInInfoId = athlete.weight_in_info_id;
+
+    // Check if weight actually changed - skip API call if same
+    const currentWeight = existingAttempt?.weight_kg;
+    const weightChanged = currentWeight !== weight;
+
+    // Mark as processing to prevent double-firing
+    processingRef.current.add(attemptNo);
+
+    // FIRST: Trigger optimistic update and reordering IMMEDIATELY (before API call)
+    // This ensures the UI updates instantly
+    onAttemptUpdate(attemptNo, athleteWeightInInfoId, weight);
+
+    // THEN: Persist to backend (in background)
+    if (weightChanged) {
+      try {
+        // Check if attempt exists with a REAL ID (not optimistic -1)
+        const hasRealAttempt = existingAttempt && existingAttempt.id > 0;
+        
+        if (!hasRealAttempt) {
+          // Create new attempt (or re-create if we only have optimistic one)
+          const response = await createNextAttempt({
+            weight_kg: weight,
+            lift_id: selectedLiftId,
+            weight_in_info_id: athleteWeightInInfoId,
+            attempt_no: attemptNo
+          });
+          // After creating, do a quiet refresh to sync the real ID from backend
+          // This is a background refresh that applies hybrid sorting
+          if (response.success) {
+            // Small delay to let the DB commit, then refresh
+            setTimeout(() => {
+              onAttemptUpdate();
+            }, 200);
+          }
+        } else if (existingAttempt.status === 'PENDING') {
+          // Update existing PENDING attempt weight only
+          await updateAttemptDirector(existingAttempt.id, { weight_kg: weight });
+        }
+      } catch (error: any) {
+        console.error('Error saving weight:', error);
+        // On error, refresh from backend to get correct state
+        onAttemptUpdate();
+      }
+    }
+    
+    // Clear processing flag after a short delay (allow re-render to complete)
+    setTimeout(() => {
+      processingRef.current.delete(attemptNo);
+    }, 100);
   };
 
   // Toggle VALID ↔ INVALID for already judged attempts (doesn't affect cursor)
@@ -175,18 +223,34 @@ export default function AthleteRow({
 
     // If attempt exists but is PENDING, show editable weight
     if (attempt && attempt.status === 'PENDING') {
+      // Use local state if available, otherwise use attempt weight from props
+      const displayValue = localWeights[attemptNo] !== undefined 
+        ? localWeights[attemptNo] 
+        : (attempt.weight_kg !== null && attempt.weight_kg !== undefined ? String(attempt.weight_kg) : '');
+      
       return (
         <td className={`px-4 py-3 text-center ${bgColor}`}>
           <input
             type="text"
             inputMode="decimal"
-            defaultValue={attempt.weight_kg !== null && attempt.weight_kg !== undefined ? attempt.weight_kg : ''}
+            value={displayValue}
+            onChange={(e) => {
+              // Update local state immediately for responsive UI
+              setLocalWeights(prev => ({ ...prev, [attemptNo]: e.target.value }));
+            }}
             onBlur={(e) => {
               const val = e.target.value.replace(',', '.');
               const newWeight = parseFloat(val);
-              if (!isNaN(newWeight) && newWeight !== attempt.weight_kg) {
+              // Call handleWeightEntry if valid weight
+              if (!isNaN(newWeight) && newWeight >= 0) {
                 handleWeightEntry(attemptNo, e.target.value);
               }
+              // Clear local state after blur - let parent's state take over
+              setLocalWeights(prev => {
+                const next = { ...prev };
+                delete next[attemptNo];
+                return next;
+              });
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -201,16 +265,29 @@ export default function AthleteRow({
 
     // No attempt yet - show input field if previous attempt is completed
     if (isPreviousAttemptCompleted(attemptNo)) {
+      // Use local state if available
+      const displayValue = localWeights[attemptNo] !== undefined ? localWeights[attemptNo] : '';
+      
       return (
         <td className={`px-4 py-3 text-center ${bgColor}`}>
           <input
             type="text"
             inputMode="decimal"
             placeholder="--"
+            value={displayValue}
+            onChange={(e) => {
+              setLocalWeights(prev => ({ ...prev, [attemptNo]: e.target.value }));
+            }}
             onBlur={(e) => {
               if (e.target.value) {
                 handleWeightEntry(attemptNo, e.target.value);
               }
+              // Clear local state after blur
+              setLocalWeights(prev => {
+                const next = { ...prev };
+                delete next[attemptNo];
+                return next;
+              });
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {

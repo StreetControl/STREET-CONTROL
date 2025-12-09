@@ -312,58 +312,80 @@ export async function getGroupAthletes(req: AuthRequest, res: Response): Promise
       });
     }
 
-    // For each athlete, get weight_in_info and attempts
-    const athletes = await Promise.all(
-      nominations.map(async (nom: any) => {
-        const formInfo = nom.form_info;
-        const athlete = formInfo?.athletes;
-        const weightCat = formInfo?.weight_categories_std;
+    // Get all nomination IDs
+    const nominationIds = nominations.map((n: any) => n.id);
 
-        // Get weight_in_info
-        const { data: weighInData } = await supabaseAdmin
-          .from('weight_in_info')
-          .select('id, bodyweight_kg, notes')
-          .eq('nomination_id', nom.id)
-          .maybeSingle();
+    // OPTIMIZED: Batch fetch all weight_in_info for all nominations
+    const { data: allWeighInData } = await supabaseAdmin
+      .from('weight_in_info')
+      .select('id, nomination_id, bodyweight_kg, notes')
+      .in('nomination_id', nominationIds);
 
-        if (!weighInData) {
-          return null; // Skip athletes without weigh-in
-        }
+    if (!allWeighInData || allWeighInData.length === 0) {
+      return res.json({
+        success: true,
+        athletes: [],
+        currentState: currentState || null
+      });
+    }
 
-        // Get attempts for this lift (attempt_no 1, 2, 3)
-        const { data: attempts } = await supabaseAdmin
-          .from('attempts')
-          .select('id, attempt_no, weight_kg, status')
-          .eq('weight_in_info_id', weighInData.id)
-          .eq('lift_id', liftId)
-          .order('attempt_no');
+    // Get all weight_in_info IDs
+    const weightInInfoIds = allWeighInData.map(w => w.id);
 
-        // Create attempts object
-        const attemptsMap: Record<number, any> = {};
-        (attempts || []).forEach((att: any) => {
-          attemptsMap[att.attempt_no] = {
-            id: att.id,
-            weight_kg: Number(att.weight_kg),
-            status: att.status
-          };
-        });
+    // OPTIMIZED: Batch fetch all attempts for all weight_in_infos for this lift
+    const { data: allAttempts } = await supabaseAdmin
+      .from('attempts')
+      .select('id, weight_in_info_id, attempt_no, weight_kg, status')
+      .in('weight_in_info_id', weightInInfoIds)
+      .eq('lift_id', liftId)
+      .order('attempt_no');
 
-        return {
-          nomination_id: nom.id,
-          weight_in_info_id: weighInData.id,
-          athlete_id: athlete?.id,
-          first_name: athlete?.first_name,
-          last_name: athlete?.last_name,
-          sex: athlete?.sex,
-          weight_category: weightCat?.name,
-          bodyweight_kg: weighInData.bodyweight_kg,
-          notes: weighInData.notes || '',
-          attempt1: attemptsMap[1] || null,
-          attempt2: attemptsMap[2] || null,
-          attempt3: attemptsMap[3] || null
+    // Create lookup maps for O(1) access
+    const weighInByNomId = new Map(allWeighInData.map(w => [w.nomination_id, w]));
+    const attemptsByWiiId = new Map<number, any[]>();
+    (allAttempts || []).forEach((att: any) => {
+      if (!attemptsByWiiId.has(att.weight_in_info_id)) {
+        attemptsByWiiId.set(att.weight_in_info_id, []);
+      }
+      attemptsByWiiId.get(att.weight_in_info_id)!.push(att);
+    });
+
+    // Build athletes array (no async needed - all data is in memory)
+    const athletes = nominations.map((nom: any) => {
+      const formInfo = nom.form_info;
+      const athlete = formInfo?.athletes;
+      const weightCat = formInfo?.weight_categories_std;
+      const weighInData = weighInByNomId.get(nom.id);
+
+      if (!weighInData) {
+        return null; // Skip athletes without weigh-in
+      }
+
+      const attempts = attemptsByWiiId.get(weighInData.id) || [];
+      const attemptsMap: Record<number, any> = {};
+      attempts.forEach((att: any) => {
+        attemptsMap[att.attempt_no] = {
+          id: att.id,
+          weight_kg: Number(att.weight_kg),
+          status: att.status
         };
-      })
-    );
+      });
+
+      return {
+        nomination_id: nom.id,
+        weight_in_info_id: weighInData.id,
+        athlete_id: athlete?.id,
+        first_name: athlete?.first_name,
+        last_name: athlete?.last_name,
+        sex: athlete?.sex,
+        weight_category: weightCat?.name,
+        bodyweight_kg: weighInData.bodyweight_kg,
+        notes: weighInData.notes || '',
+        attempt1: attemptsMap[1] || null,
+        attempt2: attemptsMap[2] || null,
+        attempt3: attemptsMap[3] || null
+      };
+    });
 
     // Filter nulls
     const validAthletes = athletes.filter(a => a !== null);

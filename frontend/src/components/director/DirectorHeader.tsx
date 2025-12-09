@@ -34,6 +34,7 @@ interface DirectorHeaderProps {
   onMarkInvalid: () => void;
   updating: boolean;
   hasCurrentAthlete: boolean;
+  isGroupCompleted: boolean;
 }
 
 export default function DirectorHeader({
@@ -49,7 +50,8 @@ export default function DirectorHeader({
   onMarkValid,
   onMarkInvalid,
   updating,
-  hasCurrentAthlete
+  hasCurrentAthlete,
+  isGroupCompleted
 }: DirectorHeaderProps) {
   return (
     <div className="flex flex-wrap items-end gap-4">
@@ -124,14 +126,14 @@ export default function DirectorHeader({
       <div className="flex gap-3 ml-auto">
         <button
           onClick={onMarkInvalid}
-          disabled={updating || !hasCurrentAthlete}
+          disabled={updating || !hasCurrentAthlete || isGroupCompleted}
           className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg border-2 border-red-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           NON VALIDA
         </button>
         <button
           onClick={onMarkValid}
-          disabled={updating || !hasCurrentAthlete}
+          disabled={updating || !hasCurrentAthlete || isGroupCompleted}
           className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg border-2 border-green-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           VALIDA

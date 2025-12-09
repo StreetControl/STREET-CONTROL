@@ -17,8 +17,6 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosE
 import type {
   SubmitVoteRequest,
   SubmitVoteResponse,
-  AdvanceAthleteRequest,
-  AdvanceAthleteResponse,
   OverrideAttemptRequest,
   OverrideAttemptResponse,
   UpdateWeightRequest,
@@ -117,14 +115,6 @@ export async function submitVote(data: SubmitVoteRequest): Promise<SubmitVoteRes
 // ============================================
 // DIRECTOR API
 // ============================================
-
-/**
- * Advance to next athlete (NEXT button)
- */
-export async function advanceToNextAthlete(data: AdvanceAthleteRequest): Promise<AdvanceAthleteResponse> {
-  const response = await api.post<AdvanceAthleteResponse>('/director/next', data);
-  return response.data;
-}
 
 /**
  * Override lift result (VAR)

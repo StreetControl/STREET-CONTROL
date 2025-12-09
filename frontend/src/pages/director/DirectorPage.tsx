@@ -54,8 +54,7 @@ interface CurrentState {
 export default function DirectorPage() {
   const { meetId } = useParams<{ meetId: string }>();
   const navigate = useNavigate();
-  // Note: useAuth() available for future auth-based features
-  useAuth();
+  useAuth(); // Auth guard
 
   const [meetName, setMeetName] = useState<string>('');
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -77,6 +76,9 @@ export default function DirectorPage() {
   const currentAthleteIndex = currentState?.current_weight_in_info_id
     ? athletes.findIndex(a => a.weight_in_info_id === currentState.current_weight_in_info_id)
     : 0;
+
+  // Check if the group is completed
+  const isGroupCompleted = currentState?.completed === true;
 
   // Load initial state
   useEffect(() => {
@@ -430,7 +432,8 @@ export default function DirectorPage() {
             onMarkValid={handleMarkValid}
             onMarkInvalid={handleMarkInvalid}
             updating={updating}
-            hasCurrentAthlete={athletes.length > 0 && currentAthleteIndex < athletes.length}
+            hasCurrentAthlete={athletes.length > 0 && currentAthleteIndex < athletes.length && !currentState?.completed}
+            isGroupCompleted={isGroupCompleted}
           />
         </div>
       </div>

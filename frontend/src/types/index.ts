@@ -25,8 +25,6 @@ export type {
   ApiError,
   SubmitVoteRequest,
   SubmitVoteResponse,
-  AdvanceAthleteRequest,
-  AdvanceAthleteResponse,
   OverrideAttemptRequest,
   OverrideAttemptResponse,
   UpdateWeightRequest,

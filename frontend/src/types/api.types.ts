@@ -39,16 +39,6 @@ export interface SubmitVoteResponse {
 // DIRECTOR API
 // ============================================
 
-export interface AdvanceAthleteRequest {
-  meet_id: number;
-}
-
-export interface AdvanceAthleteResponse {
-  success: boolean;
-  next_athlete?: Athlete;
-  message?: string;
-}
-
 export interface OverrideAttemptRequest {
   attempt_id: number;
   new_result: 'VALID' | 'INVALID';
