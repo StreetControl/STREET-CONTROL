@@ -34,12 +34,17 @@ const PORT = process.env.PORT || 5000;
 // 1. Security headers
 app.use(helmet());
 
-// 2. CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+// 2. CORS - Default to common local dev ports
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests without origin (e.g., Postman, mobile apps)
     if (!origin) return callback(null, true);
+    
+    // In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);

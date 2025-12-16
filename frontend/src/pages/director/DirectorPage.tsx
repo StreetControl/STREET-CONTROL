@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDirectorState, getGroupAthletes, updateAttemptDirector, advanceAthlete } from '../../services/api';
+import { getDirectorState, getGroupAthletes, judgeAndAdvance } from '../../services/api';
 import { ChevronLeft } from 'lucide-react';
 import { DirectorHeader, AthleteTable } from '../../components/director';
 
@@ -309,23 +309,7 @@ export default function DirectorPage() {
     loadAthletesQuiet();
   }, [currentState?.current_round, sortAthletesHybrid, loadAthletesQuiet]);
 
-  // Advance to next athlete after judgment
-  const advanceToNextAthlete = async () => {
-    if (!selectedGroupId || !selectedLiftId) return;
-    
-    try {
-      const response = await advanceAthlete(selectedGroupId, selectedLiftId);
-      if (response.success) {
-        setCurrentState(response.currentState);
-        // Background refresh to get updated data
-        loadAthletesQuiet();
-      }
-    } catch (error: any) {
-      console.error('Error advancing athlete:', error);
-    }
-  };
-
-  // Mark current attempt as VALID
+  // OPTIMIZED: Mark current attempt as VALID with optimistic UI update
   const handleMarkValid = async () => {
     if (currentAthleteIndex < 0 || currentAthleteIndex >= athletes.length || updating) return;
     const currentAthlete = athletes[currentAthleteIndex];
@@ -341,11 +325,50 @@ export default function DirectorPage() {
       return;
     }
 
+    // OPTIMISTIC UPDATE: Update UI immediately BEFORE API call
+    const previousAthletes = [...athletes];
+    const previousState = currentState ? { ...currentState } : null;
+    
+    setAthletes(prev => {
+      const updated = prev.map((a, idx) => {
+        if (idx === currentAthleteIndex) {
+          return {
+            ...a,
+            [attemptKey]: { ...attempt, status: 'VALID' }
+          };
+        }
+        return a;
+      });
+      // Re-sort with hybrid logic after status change
+      return sortAthletesHybrid(updated, currentRound);
+    });
+
     try {
       setUpdating(true);
-      await updateAttemptDirector(attempt.id, { status: 'VALID' });
-      await advanceToNextAthlete();
+      
+      // Use the optimized combined endpoint (1 API call instead of 2)
+      const response = await judgeAndAdvance({
+        attemptId: attempt.id,
+        status: 'VALID',
+        groupId: selectedGroupId!,
+        liftId: selectedLiftId!
+      });
+      
+      if (response.success) {
+        // Update state with server response
+        setCurrentState(response.currentState);
+        // Background refresh to sync any other changes
+        loadAthletesQuiet();
+      } else {
+        // Rollback on error
+        setAthletes(previousAthletes);
+        if (previousState) setCurrentState(previousState);
+        console.error('Judge advance failed:', response.error);
+      }
     } catch (error: any) {
+      // Rollback on error
+      setAthletes(previousAthletes);
+      if (previousState) setCurrentState(previousState);
       console.error('Error marking valid:', error);
       alert('Errore durante l\'aggiornamento');
     } finally {
@@ -353,7 +376,7 @@ export default function DirectorPage() {
     }
   };
 
-  // Mark current attempt as INVALID
+  // OPTIMIZED: Mark current attempt as INVALID with optimistic UI update
   const handleMarkInvalid = async () => {
     if (currentAthleteIndex < 0 || currentAthleteIndex >= athletes.length || updating) return;
     const currentAthlete = athletes[currentAthleteIndex];
@@ -369,11 +392,50 @@ export default function DirectorPage() {
       return;
     }
 
+    // OPTIMISTIC UPDATE: Update UI immediately BEFORE API call
+    const previousAthletes = [...athletes];
+    const previousState = currentState ? { ...currentState } : null;
+    
+    setAthletes(prev => {
+      const updated = prev.map((a, idx) => {
+        if (idx === currentAthleteIndex) {
+          return {
+            ...a,
+            [attemptKey]: { ...attempt, status: 'INVALID' }
+          };
+        }
+        return a;
+      });
+      // Re-sort with hybrid logic after status change
+      return sortAthletesHybrid(updated, currentRound);
+    });
+
     try {
       setUpdating(true);
-      await updateAttemptDirector(attempt.id, { status: 'INVALID' });
-      await advanceToNextAthlete();
+      
+      // Use the optimized combined endpoint (1 API call instead of 2)
+      const response = await judgeAndAdvance({
+        attemptId: attempt.id,
+        status: 'INVALID',
+        groupId: selectedGroupId!,
+        liftId: selectedLiftId!
+      });
+      
+      if (response.success) {
+        // Update state with server response
+        setCurrentState(response.currentState);
+        // Background refresh to sync any other changes
+        loadAthletesQuiet();
+      } else {
+        // Rollback on error
+        setAthletes(previousAthletes);
+        if (previousState) setCurrentState(previousState);
+        console.error('Judge advance failed:', response.error);
+      }
     } catch (error: any) {
+      // Rollback on error
+      setAthletes(previousAthletes);
+      if (previousState) setCurrentState(previousState);
       console.error('Error marking invalid:', error);
       alert('Errore durante l\'aggiornamento');
     } finally {

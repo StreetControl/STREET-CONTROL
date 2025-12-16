@@ -370,6 +370,20 @@ export async function createNextAttempt(data: {
 }
 
 /**
+ * OPTIMIZED: Judge attempt AND advance to next athlete in ONE call
+ * This reduces latency by combining 2 API calls into 1
+ */
+export async function judgeAndAdvance(data: {
+  attemptId: number;
+  status: 'VALID' | 'INVALID';
+  groupId: number;
+  liftId: string;
+}): Promise<any> {
+  const response = await api.post('/director/judge-advance', data);
+  return response.data;
+}
+
+/**
  * Advance to next athlete after judgment
  * Returns updated currentState with next athlete info
  */

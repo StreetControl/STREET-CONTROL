@@ -9,7 +9,8 @@ import {
   getGroupAthletes,
   updateAttempt,
   createNextAttempt,
-  advanceToNextAthlete
+  advanceToNextAthlete,
+  judgeAndAdvance
 } from '../controllers/directorController.js';
 import { verifyToken } from '../middleware/verifyToken.js';
 
@@ -52,4 +53,13 @@ router.post('/attempts', createNextAttempt);
  */
 router.post('/advance', advanceToNextAthlete);
 
+/**
+ * POST /api/director/judge-advance
+ * OPTIMIZED: Combined operation - judge attempt AND advance to next athlete
+ * Reduces 2 API calls to 1 for faster performance
+ * Body: { attemptId, status, groupId, liftId }
+ */
+router.post('/judge-advance', judgeAndAdvance);
+
 export default router;
+
