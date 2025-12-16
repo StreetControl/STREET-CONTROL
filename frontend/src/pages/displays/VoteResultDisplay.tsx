@@ -370,12 +370,16 @@ export default function VoteResultDisplay() {
   };
 
   // Render single judge circle with dot
-  const renderJudgeCircle = (position: 'LEFT' | 'HEAD' | 'RIGHT', vote: JudgeVote) => (
-    <div className="flex flex-col items-center">
-      {/* Position Label */}
-      <p className="text-xs text-dark-text-secondary mb-2 uppercase tracking-wider font-medium">
-        {position}
-      </p>
+  const renderJudgeCircle = (position: 'LEFT' | 'HEAD' | 'RIGHT', vote: JudgeVote) => {
+    // Translate position to Italian
+    const positionLabel = position === 'LEFT' ? 'SX' : position === 'HEAD' ? 'CENTRALE' : 'DX';
+    
+    return (
+      <div className="flex flex-col items-center">
+        {/* Position Label */}
+        <p className="text-xs text-dark-text-secondary mb-2 uppercase tracking-wider font-medium">
+          {positionLabel}
+        </p>
       
       {/* Main Circle - All same size */}
       <div className={`
@@ -395,7 +399,8 @@ export default function VoteResultDisplay() {
         transition-all duration-300
       `} />
     </div>
-  );
+    );
+  };
 
   // Get available groups for selected flight
   const availableGroups = flights.find(f => f.id === selectedFlightId)?.groups || [];

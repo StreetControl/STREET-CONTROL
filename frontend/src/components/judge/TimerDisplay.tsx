@@ -133,49 +133,54 @@ const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({
   return (
     <div className={`rounded-xl p-4 border-2 ${getBgColor()} transition-all duration-300`}>
       {/* Timer Display + Controls Row */}
-      <div className="flex items-center justify-center gap-4">
-        {/* X Button (Invalidate) */}
+      <div className="relative flex items-center justify-between min-h-[56px]">
+        {/* X Button (Invalidate) - Left side */}
         <button
           onClick={handleInvalidate}
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-red-500/20 border-2 border-red-500/50 text-red-400 hover:bg-red-500/40 hover:border-red-500 transition-all"
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-red-500/20 border-2 border-red-500/50 text-red-400 hover:bg-red-500/40 hover:border-red-500 transition-all z-10"
           title="Fuori tempo - Non valida"
         >
-          <X className="w-7 h-7" />
+          <X className="w-6 h-6" />
         </button>
 
-        {/* Timer Display */}
-        <div className={`text-5xl font-mono font-bold ${getTimerColor()}`}>
-          {formatTime(seconds)}
+        {/* Timer Display - Absolutely Centered */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className={`text-5xl font-mono font-bold ${getTimerColor()}`}>
+            {formatTime(seconds)}
+          </span>
         </div>
 
-        {/* Start/Stop Button */}
-        {!isRunning ? (
-          <button
-            onClick={handleStart}
-            disabled={seconds === 0}
-            className="flex items-center justify-center w-12 h-12 rounded-full bg-green-500/20 border border-green-500/50 text-green-400 hover:bg-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            title="Avvia"
-          >
-            <Play className="w-5 h-5" />
-          </button>
-        ) : (
-          <button
-            onClick={handleStop}
-            className="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/30 transition-all"
-            title="Stoppa"
-          >
-            <Pause className="w-5 h-5" />
-          </button>
-        )}
+        {/* Right Controls */}
+        <div className="flex items-center gap-2 z-10">
+          {/* Start/Stop Button */}
+          {!isRunning ? (
+            <button
+              onClick={handleStart}
+              disabled={seconds === 0}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500/20 border border-green-500/50 text-green-400 hover:bg-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              title="Avvia"
+            >
+              <Play className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              onClick={handleStop}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/30 transition-all"
+              title="Stoppa"
+            >
+              <Pause className="w-5 h-5" />
+            </button>
+          )}
 
-        {/* Reset Button */}
-        <button
-          onClick={handleReset}
-          className="flex items-center justify-center w-12 h-12 rounded-full bg-dark-bg border border-dark-border text-dark-text-secondary hover:bg-dark-bg-secondary hover:text-dark-text transition-all"
-          title="Riavvia"
-        >
-          <RotateCcw className="w-5 h-5" />
-        </button>
+          {/* Reset Button */}
+          <button
+            onClick={handleReset}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-dark-bg border border-dark-border text-dark-text-secondary hover:bg-dark-bg-secondary hover:text-dark-text transition-all"
+            title="Riavvia"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Legend for X button */}
