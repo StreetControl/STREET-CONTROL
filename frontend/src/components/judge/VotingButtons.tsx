@@ -12,8 +12,10 @@
 
 import { Check, ArrowUpDown, ArrowDown, HelpCircle } from 'lucide-react';
 
+export type InvalidReason = 'ROM' | 'DISCESA' | 'ALTRO';
+
 interface VotingButtonsProps {
-  onVote: (isValid: boolean) => void;
+  onVote: (isValid: boolean, reason?: InvalidReason) => void;
   disabled?: boolean;
   hasVoted?: boolean;
   lastVote?: boolean | null;  // true = valid, false = invalid, null = no vote yet
@@ -35,9 +37,9 @@ export default function VotingButtons({
     }
   };
 
-  const handleVoteInvalid = () => {
+  const handleVoteInvalid = (reason: InvalidReason) => {
     if (!disabled && !hasVoted) {
-      onVote(false);
+      onVote(false, reason);
     }
   };
 
@@ -86,7 +88,7 @@ export default function VotingButtons({
           {/* Button 1 - ROM (Red) - Range of Motion */}
           <div className="flex flex-col items-center">
             <button
-              onClick={handleVoteInvalid}
+              onClick={() => handleVoteInvalid('ROM')}
               disabled={disabled || hasVoted}
               className={`${baseButtonClass} 
                 w-20 h-20 sm:w-24 sm:h-24
@@ -104,7 +106,7 @@ export default function VotingButtons({
           {/* Button 2 - Discesa (Blue) */}
           <div className="flex flex-col items-center">
             <button
-              onClick={handleVoteInvalid}
+              onClick={() => handleVoteInvalid('DISCESA')}
               disabled={disabled || hasVoted}
               className={`${baseButtonClass} 
                 w-20 h-20 sm:w-24 sm:h-24
@@ -122,7 +124,7 @@ export default function VotingButtons({
           {/* Button 3 - Altro (Yellow) */}
           <div className="flex flex-col items-center">
             <button
-              onClick={handleVoteInvalid}
+              onClick={() => handleVoteInvalid('ALTRO')}
               disabled={disabled || hasVoted}
               className={`${baseButtonClass} 
                 w-20 h-20 sm:w-24 sm:h-24

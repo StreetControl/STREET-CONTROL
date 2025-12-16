@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDirectorState, getGroupAthletes, submitJudgeVote, forceInvalidAttempt, broadcastTimerStart } from '../../services/api';
+import { getDirectorState, getGroupAthletes, submitJudgeVote, forceInvalidAttempt, broadcastTimerStart, broadcastTimerStop, broadcastTimerReset } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { ChevronLeft, Gavel, RefreshCw } from 'lucide-react';
 import { TimerDisplay, AthleteInfoCard, VotingButtons } from '../../components/judge';
@@ -313,7 +313,7 @@ export default function JudgePage() {
   };
 
   // Handle vote submission
-  const handleVote = useCallback(async (isValid: boolean) => {
+  const handleVote = useCallback(async (isValid: boolean, reason?: 'ROM' | 'DISCESA' | 'ALTRO') => {
     if (!currentAthlete || !selectedGroupId || !selectedLiftId || hasVoted) return;
 
     // Get current attempt ID
@@ -334,6 +334,7 @@ export default function JudgePage() {
         attemptId: attempt.id,
         judgePosition: judgePosition as 'HEAD' | 'LEFT' | 'RIGHT',
         vote: isValid,
+        reason: isValid ? undefined : reason,  // Only send reason for invalid votes
         groupId: selectedGroupId,
         liftId: selectedLiftId,
         meetId: parseInt(meetId!)
@@ -421,6 +422,30 @@ export default function JudgePage() {
       console.error('[JudgePage] Failed to broadcast timer:', err);
     }
   }, [meetId, selectedGroupId, selectedLiftId]);
+
+  // Handle timer stop - broadcast to display screens
+  const handleTimerStop = useCallback(async () => {
+    if (!meetId) return;
+
+    try {
+      await broadcastTimerStop({ meetId: parseInt(meetId) });
+      console.log('[JudgePage] Timer stop broadcasted');
+    } catch (err) {
+      console.error('[JudgePage] Failed to broadcast timer stop:', err);
+    }
+  }, [meetId]);
+
+  // Handle timer reset - broadcast to display screens
+  const handleTimerReset = useCallback(async () => {
+    if (!meetId) return;
+
+    try {
+      await broadcastTimerReset({ meetId: parseInt(meetId) });
+      console.log('[JudgePage] Timer reset broadcasted');
+    } catch (err) {
+      console.error('[JudgePage] Failed to broadcast timer reset:', err);
+    }
+  }, [meetId]);
 
   const selectedFlight = flights.find(f => f.id === selectedFlightId);
   const availableGroups = selectedFlight?.groups || [];
@@ -543,6 +568,8 @@ export default function JudgePage() {
             onTimeExpired={handleTimerExpired}
             onInvalidate={handleForceInvalid}
             onTimerStart={handleTimerStart}
+            onTimerStop={handleTimerStop}
+            onTimerReset={handleTimerReset}
             shouldReset={timerShouldReset}
           />
         )}

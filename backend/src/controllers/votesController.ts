@@ -9,11 +9,13 @@ import type { AuthRequest } from '../types/index.js';
 
 // Types
 type JudgePosition = 'HEAD' | 'LEFT' | 'RIGHT';
+type InvalidReason = 'ROM' | 'DISCESA' | 'ALTRO';
 
 interface SubmitVoteBody {
   attemptId: number;
   judgePosition: JudgePosition;
   vote: boolean;  // true = VALID, false = INVALID
+  reason?: InvalidReason;  // Reason for invalid vote
   groupId: number;
   liftId: string;
   meetId: number;  // For broadcast to display screens
@@ -32,7 +34,7 @@ interface ForceInvalidBody {
  */
 export async function submitVoteHandler(req: AuthRequest, res: Response): Promise<Response> {
   try {
-    const { attemptId, judgePosition, vote, groupId, liftId, meetId } = req.body as SubmitVoteBody;
+    const { attemptId, judgePosition, vote, reason, groupId, liftId, meetId } = req.body as SubmitVoteBody;
 
     // Validation
     if (!attemptId || typeof attemptId !== 'number') {
@@ -78,7 +80,7 @@ export async function submitVoteHandler(req: AuthRequest, res: Response): Promis
     }
 
     // Submit vote to voting service
-    const result = await submitVote(attemptId, judgePosition, vote, groupId, liftId, meetId);
+    const result = await submitVote(attemptId, judgePosition, vote, groupId, liftId, meetId, reason);
 
     if (!result.success) {
       return res.status(400).json(result);

@@ -126,12 +126,33 @@ export async function broadcastTimerStart(data: {
 }
 
 /**
+ * Broadcast timer stop to display screens
+ */
+export async function broadcastTimerStop(data: {
+  meetId: number;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  const response = await api.post('/votes/timer-stop', data);
+  return response.data;
+}
+
+/**
+ * Broadcast timer reset to display screens
+ */
+export async function broadcastTimerReset(data: {
+  meetId: number;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  const response = await api.post('/votes/timer-reset', data);
+  return response.data;
+}
+
+/**
  * Submit judge vote (new interface for JudgePage)
  */
 export async function submitJudgeVote(data: {
   attemptId: number;
   judgePosition: 'HEAD' | 'LEFT' | 'RIGHT';
   vote: boolean;
+  reason?: 'ROM' | 'DISCESA' | 'ALTRO';  // Reason for invalid vote
   groupId: number;
   liftId: string;
   meetId: number;  // For broadcast to display screens
@@ -434,6 +455,7 @@ export async function judgeAndAdvance(data: {
   status: 'VALID' | 'INVALID';
   groupId: number;
   liftId: string;
+  meetId?: number;  // For broadcast to display screens
 }): Promise<any> {
   const response = await api.post('/director/judge-advance', data);
   return response.data;

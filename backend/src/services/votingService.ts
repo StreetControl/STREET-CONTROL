@@ -23,9 +23,11 @@ import { supabaseAdmin } from './supabase.js';
 // Types
 type JudgePosition = 'HEAD' | 'LEFT' | 'RIGHT';
 type VoteResult = 'VALID' | 'INVALID' | 'PENDING';
+type InvalidReason = 'ROM' | 'DISCESA' | 'ALTRO';
 
 interface PendingVotes {
   votes: Map<JudgePosition, boolean>;  // true = valid, false = invalid
+  reasons: Map<JudgePosition, InvalidReason>;  // Reason for invalid votes
   attemptId: number;
   groupId: number;
   liftId: string;
@@ -62,7 +64,8 @@ async function broadcastVote(
   judgePosition: JudgePosition,
   vote: boolean,
   votesReceived: number,
-  allVotes: Map<JudgePosition, boolean>
+  allVotes: Map<JudgePosition, boolean>,
+  reason?: InvalidReason
 ): Promise<void> {
   const channelName = `display_votes_${meetId}`;
 
@@ -82,6 +85,7 @@ async function broadcastVote(
       liftId,
       judgePosition,
       vote,
+      reason,  // Include reason for invalid votes
       votesReceived,
       totalExpected: 3,
       votes: votesObject,
@@ -89,7 +93,7 @@ async function broadcastVote(
     }
   });
 
-  console.log(`[VotingService] Broadcasted vote: ${judgePosition} = ${vote ? 'VALID' : 'INVALID'}`);
+  console.log(`[VotingService] Broadcasted vote: ${judgePosition} = ${vote ? 'VALID' : 'INVALID'}${reason ? ` (${reason})` : ''}`);
 }
 
 /**
@@ -327,6 +331,7 @@ async function advanceToNextAthleteInternal(groupId: number, liftId: string): Pr
  * @param groupId - Current group ID
  * @param liftId - Current lift ID
  * @param meetId - Meet ID (for broadcast)
+ * @param reason - Reason for invalid vote (ROM, DISCESA, ALTRO)
  */
 export async function submitVote(
   attemptId: number,
@@ -334,7 +339,8 @@ export async function submitVote(
   vote: boolean,
   groupId: number,
   liftId: string,
-  meetId: number
+  meetId: number,
+  reason?: InvalidReason
 ): Promise<VoteResponse> {
   try {
     const voteKey = getVoteKey(groupId, liftId);
@@ -351,6 +357,7 @@ export async function submitVote(
 
       pending = {
         votes: new Map(),
+        reasons: new Map(),
         attemptId,
         groupId,
         liftId,
@@ -369,6 +376,7 @@ export async function submitVote(
 
       pending = {
         votes: new Map(),
+        reasons: new Map(),
         attemptId,
         groupId,
         liftId,
@@ -389,15 +397,18 @@ export async function submitVote(
       };
     }
 
-    // Record the vote
+    // Record the vote and reason
     pending.votes.set(judgePosition, vote);
+    if (!vote && reason) {
+      pending.reasons.set(judgePosition, reason);
+    }
 
-    console.log(`[VotingService] Vote received: ${judgePosition} = ${vote ? 'VALID' : 'INVALID'} for attempt ${attemptId}`);
+    console.log(`[VotingService] Vote received: ${judgePosition} = ${vote ? 'VALID' : 'INVALID'}${reason ? ` (${reason})` : ''} for attempt ${attemptId}`);
     console.log(`[VotingService] Votes so far: ${pending.votes.size}/3`);
 
     // BROADCAST the vote to display screens immediately
     try {
-      await broadcastVote(meetId, groupId, liftId, judgePosition, vote, pending.votes.size, pending.votes);
+      await broadcastVote(meetId, groupId, liftId, judgePosition, vote, pending.votes.size, pending.votes, reason);
     } catch (broadcastError) {
       console.error('[VotingService] Broadcast error (non-fatal):', broadcastError);
     }
@@ -515,11 +526,21 @@ export async function forceInvalid(
 
     // BROADCAST force invalid result to display screens
     try {
-      const forceInvalidVotes = new Map<JudgePosition, boolean>();
-      forceInvalidVotes.set('HEAD', false);
-      forceInvalidVotes.set('LEFT', false);
-      forceInvalidVotes.set('RIGHT', false);
-      await broadcastFinalResult(meetId, groupId, liftId, 'INVALID', forceInvalidVotes);
+      // Send specific force_invalid event (all circles red)
+      const channelName = `display_votes_${meetId}`;
+      const channel = supabaseAdmin.channel(channelName);
+      
+      await channel.send({
+        type: 'broadcast',
+        event: 'force_invalid',
+        payload: {
+          groupId,
+          liftId,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      console.log('[VotingService] Broadcasted force_invalid event');
     } catch (broadcastError) {
       console.error('[VotingService] Broadcast error (non-fatal):', broadcastError);
     }

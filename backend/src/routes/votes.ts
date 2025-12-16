@@ -60,6 +60,84 @@ router.post('/timer-start', async (req: AuthRequest, res: Response) => {
 });
 
 /**
+ * POST /api/votes/timer-stop
+ * Broadcast timer stop to display screens
+ * Body: { meetId }
+ */
+router.post('/timer-stop', async (req: AuthRequest, res: Response) => {
+    try {
+        const { meetId } = req.body;
+
+        if (!meetId) {
+            return res.status(400).json({
+                success: false,
+                error: 'meetId is required'
+            });
+        }
+
+        // Import supabase to broadcast
+        const { supabaseAdmin } = await import('../services/supabase.js');
+        const channelName = `display_votes_${meetId}`;
+        
+        await supabaseAdmin.channel(channelName).send({
+            type: 'broadcast',
+            event: 'timer_stopped',
+            payload: {}
+        });
+
+        return res.json({
+            success: true,
+            message: 'Timer stop broadcasted'
+        });
+    } catch (error: any) {
+        console.error('Error broadcasting timer stop:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to broadcast timer stop'
+        });
+    }
+});
+
+/**
+ * POST /api/votes/timer-reset
+ * Broadcast timer reset to display screens
+ * Body: { meetId }
+ */
+router.post('/timer-reset', async (req: AuthRequest, res: Response) => {
+    try {
+        const { meetId } = req.body;
+
+        if (!meetId) {
+            return res.status(400).json({
+                success: false,
+                error: 'meetId is required'
+            });
+        }
+
+        // Import supabase to broadcast
+        const { supabaseAdmin } = await import('../services/supabase.js');
+        const channelName = `display_votes_${meetId}`;
+        
+        await supabaseAdmin.channel(channelName).send({
+            type: 'broadcast',
+            event: 'timer_reset',
+            payload: {}
+        });
+
+        return res.json({
+            success: true,
+            message: 'Timer reset broadcasted'
+        });
+    } catch (error: any) {
+        console.error('Error broadcasting timer reset:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to broadcast timer reset'
+        });
+    }
+});
+
+/**
  * GET /api/votes/status
  * Get current vote status
  * Query: ?groupId=1&liftId=MU

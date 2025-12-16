@@ -18,6 +18,8 @@ interface TimerDisplayProps {
   onTimeExpired?: () => void;
   onInvalidate?: () => void;  // Called when X button is pressed
   onTimerStart?: (seconds: number) => void;  // Called when timer is started (for broadcast)
+  onTimerStop?: () => void;   // Called when timer is stopped (for broadcast)
+  onTimerReset?: () => void;  // Called when timer is reset (for broadcast)
   shouldReset?: boolean;  // When true, reset timer
 }
 
@@ -31,6 +33,8 @@ const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({
   onTimeExpired,
   onInvalidate,
   onTimerStart,
+  onTimerStop,
+  onTimerReset,
   shouldReset = false
 }, ref) => {
   const [seconds, setSeconds] = useState(defaultSeconds);
@@ -80,13 +84,17 @@ const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({
 
   const handleStop = useCallback(() => {
     setIsRunning(false);
-  }, []);
+    // Broadcast timer stop
+    onTimerStop?.();
+  }, [onTimerStop]);
 
   const handleReset = useCallback(() => {
     setIsRunning(false);
     setSeconds(defaultSeconds);
     setHasExpired(false);
-  }, [defaultSeconds]);
+    // Broadcast timer reset
+    onTimerReset?.();
+  }, [defaultSeconds, onTimerReset]);
 
   const handleInvalidate = useCallback(() => {
     setIsRunning(false);

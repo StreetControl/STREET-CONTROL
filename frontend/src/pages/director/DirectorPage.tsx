@@ -460,7 +460,8 @@ export default function DirectorPage() {
         attemptId: attempt.id,
         status: 'VALID',
         groupId: selectedGroupId!,
-        liftId: selectedLiftId!
+        liftId: selectedLiftId!,
+        meetId: parseInt(meetId!)
       });
       
       if (response.success) {
@@ -527,7 +528,8 @@ export default function DirectorPage() {
         attemptId: attempt.id,
         status: 'INVALID',
         groupId: selectedGroupId!,
-        liftId: selectedLiftId!
+        liftId: selectedLiftId!,
+        meetId: parseInt(meetId!)
       });
       
       if (response.success) {

@@ -824,7 +824,7 @@ export async function advanceToNextAthlete(req: AuthRequest, res: Response): Pro
  */
 export async function judgeAndAdvance(req: AuthRequest, res: Response): Promise<Response> {
   try {
-    const { attemptId, status, groupId, liftId } = req.body;
+    const { attemptId, status, groupId, liftId, meetId } = req.body;
 
     if (!attemptId || !status || !groupId || !liftId) {
       return res.status(400).json({
@@ -854,6 +854,29 @@ export async function judgeAndAdvance(req: AuthRequest, res: Response): Promise<
         success: false,
         error: 'Failed to update attempt'
       });
+    }
+
+    // BROADCAST to display screens (if meetId provided)
+    if (meetId) {
+      try {
+        const channelName = `display_votes_${meetId}`;
+        const channel = supabaseAdmin.channel(channelName);
+        
+        await channel.send({
+          type: 'broadcast',
+          event: 'director_vote',
+          payload: {
+            groupId,
+            liftId,
+            status,  // 'VALID' or 'INVALID'
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+        console.log(`[Director] Broadcasted director_vote: ${status}`);
+      } catch (broadcastError) {
+        console.error('[Director] Broadcast error (non-fatal):', broadcastError);
+      }
     }
 
     // STEP 2: Get current state for this group+lift

@@ -59,7 +59,7 @@ export async function getCurrentAttempt(req: AuthRequest, res: Response): Promis
       });
     }
 
-    // Get weight_in_info with athlete details
+    // Get weight_in_info with athlete details (through form_info)
     const { data: weightInInfo, error: wiiError } = await supabaseAdmin
       .from('weight_in_info')
       .select(`
@@ -67,14 +67,16 @@ export async function getCurrentAttempt(req: AuthRequest, res: Response): Promis
         bodyweight_kg,
         nomination:nomination_id (
           id,
-          athlete:athlete_id (
-            id,
-            first_name,
-            last_name,
-            sex
-          ),
-          weight_category:weight_category_id (
-            name
+          form_info:form_id (
+            athlete:athlete_id (
+              id,
+              first_name,
+              last_name,
+              sex
+            ),
+            weight_category:weight_cat_id (
+              name
+            )
           )
         )
       `)
@@ -112,8 +114,9 @@ export async function getCurrentAttempt(req: AuthRequest, res: Response): Promis
 
     // Build response
     const nomination = weightInInfo.nomination as any;
-    const athlete = nomination?.athlete;
-    const weightCategory = nomination?.weight_category;
+    const formInfo = nomination?.form_info;
+    const athlete = formInfo?.athlete;
+    const weightCategory = formInfo?.weight_category;
 
     return res.json({
       success: true,
