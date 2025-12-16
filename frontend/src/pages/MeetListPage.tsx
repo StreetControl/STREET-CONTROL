@@ -56,9 +56,13 @@ const MeetListPage = () => {
   };
 
   const handleMeetClick = (meetId: number) => {
-    // DIRECTOR navigates to director page, others to settings
+    // DIRECTOR navigates to director page
     if (activeRole?.role === 'DIRECTOR') {
       navigate(`/meets/${meetId}/director`);
+    // REFEREE navigates to judge page
+    } else if (activeRole?.role === 'REFEREE') {
+      navigate(`/meets/${meetId}/judge`);
+    // Others (ORGANIZER) go to settings
     } else {
       navigate(`/meets/${meetId}/settings`);
     }

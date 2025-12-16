@@ -112,6 +112,27 @@ export async function submitVote(data: SubmitVoteRequest): Promise<SubmitVoteRes
   return response.data;
 }
 
+/**
+ * Submit judge vote (new interface for JudgePage)
+ */
+export async function submitJudgeVote(data: {
+  attemptId: number;
+  judgePosition: 'HEAD' | 'LEFT' | 'RIGHT';
+  vote: boolean;
+  groupId: number;
+  liftId: string;
+}): Promise<{ 
+  success: boolean; 
+  votesReceived: number; 
+  totalExpected: number;
+  finalResult: string | null;
+  message?: string;
+  error?: string;
+}> {
+  const response = await api.post('/votes', data);
+  return response.data;
+}
+
 // ============================================
 // DIRECTOR API
 // ============================================

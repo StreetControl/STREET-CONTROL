@@ -16,6 +16,7 @@ import athletesRoutes from './routes/athletes.js';
 import divisionRoutes from './routes/division.js';
 import weighInRoutes from './routes/weighIn.js';
 import directorRoutes from './routes/director.js';
+import votesRoutes from './routes/votes.js';
 
 // Load environment variables
 dotenv.config();
@@ -119,6 +120,9 @@ app.use('/api', weighInRoutes);
 
 // Director routes
 app.use('/api/director', directorRoutes);
+
+// Votes routes (judges)
+app.use('/api/votes', votesRoutes);
 
 // ============================================
 // ERROR HANDLING

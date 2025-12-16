@@ -14,6 +14,7 @@ import SelectRolePage from './pages/auth/SelectRolePage';
 import MeetListPage from './pages/MeetListPage';
 import MeetSettingsPage from './pages/organizer/MeetSettingsPage';
 import DirectorPage from './pages/director/DirectorPage';
+import JudgePage from './pages/judge/JudgePage';
 
 function App() {
   const { isAuthenticated, hasActiveRole } = useAuth();
@@ -79,6 +80,16 @@ function App() {
           element={
             <ProtectedRoute requireActiveRole requireRole="DIRECTOR">
               <DirectorPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* JUDGE Route - Voting page for referees */}
+        <Route 
+          path="/meets/:meetId/judge" 
+          element={
+            <ProtectedRoute requireActiveRole requireRole="REFEREE">
+              <JudgePage />
             </ProtectedRoute>
           } 
         />
