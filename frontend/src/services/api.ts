@@ -133,6 +133,26 @@ export async function submitJudgeVote(data: {
   return response.data;
 }
 
+/**
+ * Force INVALID - HEAD judge X button
+ * Immediately marks attempt as INVALID without waiting for other judges
+ */
+export async function forceInvalidAttempt(data: {
+  attemptId: number;
+  groupId: number;
+  liftId: string;
+}): Promise<{ 
+  success: boolean; 
+  votesReceived: number; 
+  totalExpected: number;
+  finalResult: string | null;
+  message?: string;
+  error?: string;
+}> {
+  const response = await api.post('/votes/force-invalid', data);
+  return response.data;
+}
+
 // ============================================
 // DIRECTOR API
 // ============================================

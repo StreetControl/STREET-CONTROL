@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDirectorState, getGroupAthletes, judgeAndAdvance } from '../../services/api';
+import { supabase } from '../../services/supabase';
 import { ChevronLeft } from 'lucide-react';
 import { DirectorHeader, AthleteTable } from '../../components/director';
 
@@ -161,6 +162,114 @@ export default function DirectorPage() {
       setLoadingAthletes(false);
     }
   };
+
+  // Subscribe to attempts changes (receive updates when judges vote)
+  useEffect(() => {
+    if (!selectedGroupId || !selectedLiftId || athletes.length === 0) return;
+
+    // Get all attempt IDs for this group
+    const attemptIds: number[] = [];
+    athletes.forEach(athlete => {
+      if (athlete.attempt1?.id) attemptIds.push(athlete.attempt1.id);
+      if (athlete.attempt2?.id) attemptIds.push(athlete.attempt2.id);
+      if (athlete.attempt3?.id) attemptIds.push(athlete.attempt3.id);
+    });
+
+    if (attemptIds.length === 0) return;
+
+    const channel = supabase
+      .channel(`director_attempts_${selectedGroupId}_${selectedLiftId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'attempts'
+        },
+        (payload) => {
+          // Check if this attempt is one of ours
+          if (attemptIds.includes(payload.new.id)) {
+            console.log('[DirectorPage] Attempt updated:', payload.new);
+            
+            // Update the athlete's attempt in state immediately
+            setAthletes(prevAthletes => {
+              return prevAthletes.map(athlete => {
+                const newAthlete = { ...athlete };
+                
+                // Check which attempt was updated
+                if (athlete.attempt1?.id === payload.new.id) {
+                  newAthlete.attempt1 = {
+                    id: payload.new.id,
+                    status: payload.new.status,
+                    weight_kg: payload.new.weight_kg
+                  };
+                } else if (athlete.attempt2?.id === payload.new.id) {
+                  newAthlete.attempt2 = {
+                    id: payload.new.id,
+                    status: payload.new.status,
+                    weight_kg: payload.new.weight_kg
+                  };
+                } else if (athlete.attempt3?.id === payload.new.id) {
+                  newAthlete.attempt3 = {
+                    id: payload.new.id,
+                    status: payload.new.status,
+                    weight_kg: payload.new.weight_kg
+                  };
+                }
+                
+                return newAthlete;
+              });
+            });
+
+            // If attempt was judged (VALID/INVALID), reload after delay to update cursor
+            if (payload.new.status === 'VALID' || payload.new.status === 'INVALID') {
+              setTimeout(() => {
+                loadAthletesQuiet();
+              }, 1000);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedGroupId, selectedLiftId, athletes]);
+
+  // Subscribe to current_state changes (cursor position updated by judges voting)
+  useEffect(() => {
+    if (!selectedGroupId || !selectedLiftId) return;
+
+    const channel = supabase
+      .channel(`director_current_state_${selectedGroupId}_${selectedLiftId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'current_state',
+          filter: `group_id=eq.${selectedGroupId}`
+        },
+        (payload) => {
+          // Only update if it's for our lift
+          if (payload.new.lift_id === selectedLiftId) {
+            console.log('[DirectorPage] current_state updated:', payload.new);
+            
+            setCurrentState({
+              current_round: payload.new.current_attempt_no,
+              current_weight_in_info_id: payload.new.current_weight_in_info_id,
+              completed: payload.new.completed
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedGroupId, selectedLiftId]);
 
   // Handlers
   const handleFlightChange = (flightId: number) => {

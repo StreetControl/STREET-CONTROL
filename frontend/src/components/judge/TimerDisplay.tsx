@@ -5,21 +5,31 @@
  * Features:
  * - 60 second countdown (default)
  * - Start/Stop/Reset controls
- * - Visual warning when time is low
+ * - X button to invalidate attempt (fuori tempo)
+ * - Auto-reset when shouldReset prop changes to true
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { Play, Pause, RotateCcw, X } from 'lucide-react';
 
 interface TimerDisplayProps {
   defaultSeconds?: number;
   onTimeExpired?: () => void;
+  onInvalidate?: () => void;  // Called when X button is pressed
+  shouldReset?: boolean;  // When true, reset timer
 }
 
-export default function TimerDisplay({ 
+export interface TimerDisplayRef {
+  reset: () => void;
+  stop: () => void;
+}
+
+const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({ 
   defaultSeconds = 60,
-  onTimeExpired 
-}: TimerDisplayProps) {
+  onTimeExpired,
+  onInvalidate,
+  shouldReset = false
+}, ref) => {
   const [seconds, setSeconds] = useState(defaultSeconds);
   const [isRunning, setIsRunning] = useState(false);
   const [hasExpired, setHasExpired] = useState(false);
@@ -47,6 +57,15 @@ export default function TimerDisplay({
     };
   }, [isRunning, seconds, onTimeExpired]);
 
+  // Watch for shouldReset prop changes
+  useEffect(() => {
+    if (shouldReset) {
+      setIsRunning(false);
+      setSeconds(defaultSeconds);
+      setHasExpired(false);
+    }
+  }, [shouldReset, defaultSeconds]);
+
   const handleStart = useCallback(() => {
     if (seconds > 0) {
       setIsRunning(true);
@@ -63,6 +82,18 @@ export default function TimerDisplay({
     setSeconds(defaultSeconds);
     setHasExpired(false);
   }, [defaultSeconds]);
+
+  const handleInvalidate = useCallback(() => {
+    setIsRunning(false);
+    setHasExpired(true);
+    onInvalidate?.();
+  }, [onInvalidate]);
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    reset: handleReset,
+    stop: handleStop
+  }), [handleReset, handleStop]);
 
   // Format MM:SS
   const formatTime = (secs: number): string => {
@@ -88,20 +119,23 @@ export default function TimerDisplay({
 
   return (
     <div className={`rounded-xl p-4 border-2 ${getBgColor()} transition-all duration-300`}>
-      {/* Timer Label */}
-      <div className="text-center mb-2">
-        <span className="text-xs uppercase tracking-wider text-dark-text-secondary font-medium">
-          Timer
-        </span>
-      </div>
+      {/* Timer Display + Controls Row */}
+      <div className="flex items-center justify-center gap-4">
+        {/* X Button (Invalidate) */}
+        <button
+          onClick={handleInvalidate}
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-red-500/20 border-2 border-red-500/50 text-red-400 hover:bg-red-500/40 hover:border-red-500 transition-all"
+          title="Fuori tempo - Non valida"
+        >
+          <X className="w-7 h-7" />
+        </button>
 
-      {/* Timer Display */}
-      <div className={`text-5xl font-mono font-bold text-center mb-4 ${getTimerColor()}`}>
-        {formatTime(seconds)}
-      </div>
+        {/* Timer Display */}
+        <div className={`text-5xl font-mono font-bold ${getTimerColor()}`}>
+          {formatTime(seconds)}
+        </div>
 
-      {/* Controls */}
-      <div className="flex justify-center gap-3">
+        {/* Start/Stop Button */}
         {!isRunning ? (
           <button
             onClick={handleStart}
@@ -115,24 +149,32 @@ export default function TimerDisplay({
           <button
             onClick={handleStop}
             className="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/30 transition-all"
-            title="Pausa"
+            title="Stoppa"
           >
             <Pause className="w-5 h-5" />
           </button>
         )}
         
+        {/* Reset Button */}
         <button
           onClick={handleReset}
           className="flex items-center justify-center w-12 h-12 rounded-full bg-dark-bg border border-dark-border text-dark-text-secondary hover:bg-dark-bg-secondary hover:text-dark-text transition-all"
-          title="Reset"
+          title="Riavvia"
         >
           <RotateCcw className="w-5 h-5" />
         </button>
       </div>
 
+      {/* Legend for X button */}
+      <div className="mt-3 text-center">
+        <p className="text-xs text-dark-text-secondary">
+          <span className="text-red-400 font-medium">✕</span> = Tempo scaduto, prova non valida
+        </p>
+      </div>
+
       {/* Expired Message */}
       {hasExpired && (
-        <div className="mt-3 text-center">
+        <div className="mt-2 text-center">
           <span className="text-red-400 text-sm font-medium animate-pulse">
             ⏰ Tempo scaduto!
           </span>
@@ -140,4 +182,8 @@ export default function TimerDisplay({
       )}
     </div>
   );
-}
+});
+
+TimerDisplay.displayName = 'TimerDisplay';
+
+export default TimerDisplay;

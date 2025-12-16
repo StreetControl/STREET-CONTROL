@@ -9,7 +9,8 @@
  * 2. Vote stored in memory Map
  * 3. When 3 votes received → calculate result
  * 4. Update attempts.status in DB
- * 5. Clear votes from memory
+ * 5. Advance to next athlete (update current_state)
+ * 6. Clear votes from memory
  */
 
 import { supabaseAdmin } from './supabase.js';
@@ -32,6 +33,8 @@ interface VoteResponse {
   votesReceived: number;
   totalExpected: number;
   finalResult: VoteResult | null;
+  advanced?: boolean;  // true if we advanced to next athlete
+  nextAthleteId?: number | null;
   message?: string;
   error?: string;
 }
@@ -48,6 +51,164 @@ const VOTE_TIMEOUT_MS = 60000;
  */
 function getVoteKey(groupId: number, liftId: string): string {
   return `${groupId}-${liftId}`;
+}
+
+/**
+ * Sort athletes by attempt weight (for determining next athlete)
+ */
+function sortAthletesByAttemptWeight(athletes: any[], attemptNo: number): any[] {
+  return [...athletes].sort((a, b) => {
+    const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const attemptA = a[attemptKey];
+    const attemptB = b[attemptKey];
+    
+    const weightA = attemptA?.weight_kg;
+    const weightB = attemptB?.weight_kg;
+    
+    // null/undefined weights go last
+    if (weightA === null || weightA === undefined) return 1;
+    if (weightB === null || weightB === undefined) return -1;
+    
+    // Sort by weight ascending
+    if (weightA !== weightB) return weightA - weightB;
+    
+    // Tie-breaker: higher bodyweight goes first
+    return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
+  });
+}
+
+/**
+ * Find next athlete who needs to attempt
+ */
+function findNextAthleteForRound(athletes: any[], attemptNo: number): any | null {
+  const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
+  const sorted = sortAthletesByAttemptWeight(athletes, attemptNo);
+  
+  for (const athlete of sorted) {
+    const attempt = athlete[attemptKey];
+    if (!attempt || attempt.status === 'PENDING') {
+      return athlete;
+    }
+  }
+  return null;
+}
+
+/**
+ * Advance to next athlete after voting is complete
+ * Returns the next athlete's weight_in_info_id or null if group completed
+ */
+async function advanceToNextAthleteInternal(groupId: number, liftId: string): Promise<{
+  advanced: boolean;
+  nextAthleteId: number | null;
+  currentRound: number;
+}> {
+  try {
+    // Get current state
+    const { data: currentState } = await supabaseAdmin
+      .from('current_state')
+      .select('*')
+      .eq('group_id', groupId)
+      .eq('lift_id', liftId)
+      .maybeSingle();
+
+    if (!currentState) {
+      return { advanced: false, nextAthleteId: null, currentRound: 1 };
+    }
+
+    // Get nominations for this group
+    const { data: nominations } = await supabaseAdmin
+      .from('nomination')
+      .select('id')
+      .eq('group_id', groupId);
+
+    if (!nominations || nominations.length === 0) {
+      return { advanced: false, nextAthleteId: null, currentRound: currentState.current_attempt_no };
+    }
+
+    const nomIds = nominations.map(n => n.id);
+    
+    // Get weight_in_info for all nominations
+    const { data: weighInInfos } = await supabaseAdmin
+      .from('weight_in_info')
+      .select('id, nomination_id, bodyweight_kg')
+      .in('nomination_id', nomIds);
+
+    if (!weighInInfos || weighInInfos.length === 0) {
+      return { advanced: false, nextAthleteId: null, currentRound: currentState.current_attempt_no };
+    }
+
+    // Get all attempts for this lift
+    const wiiIds = weighInInfos.map(w => w.id);
+    const { data: allAttempts } = await supabaseAdmin
+      .from('attempts')
+      .select('id, weight_in_info_id, attempt_no, weight_kg, status')
+      .in('weight_in_info_id', wiiIds)
+      .eq('lift_id', liftId);
+
+    // Build athlete data
+    const athleteData = weighInInfos.map(wii => {
+      const attempts = (allAttempts || []).filter(a => a.weight_in_info_id === wii.id);
+      const attemptsMap: Record<number, any> = {};
+      attempts.forEach(att => {
+        attemptsMap[att.attempt_no] = {
+          id: att.id,
+          weight_kg: Number(att.weight_kg),
+          status: att.status
+        };
+      });
+
+      return {
+        weight_in_info_id: wii.id,
+        bodyweight_kg: wii.bodyweight_kg,
+        attempt1: attemptsMap[1] || null,
+        attempt2: attemptsMap[2] || null,
+        attempt3: attemptsMap[3] || null
+      };
+    });
+
+    // Find next athlete
+    let currentRound = currentState.current_attempt_no;
+    let nextAthlete = findNextAthleteForRound(athleteData, currentRound);
+
+    // If no athlete found in current round, try next rounds
+    if (!nextAthlete && currentRound < 3) {
+      currentRound++;
+      nextAthlete = findNextAthleteForRound(athleteData, currentRound);
+    }
+    if (!nextAthlete && currentRound < 3) {
+      currentRound = 3;
+      nextAthlete = findNextAthleteForRound(athleteData, currentRound);
+    }
+
+    // Update current_state
+    const { error: updateError } = await supabaseAdmin
+      .from('current_state')
+      .update({
+        current_attempt_no: currentRound,
+        current_weight_in_info_id: nextAthlete?.weight_in_info_id || null,
+        completed: !nextAthlete,
+        updated_at: new Date().toISOString()
+      })
+      .eq('group_id', groupId)
+      .eq('lift_id', liftId);
+
+    if (updateError) {
+      console.error('[VotingService] Failed to update current_state:', updateError);
+      return { advanced: false, nextAthleteId: null, currentRound };
+    }
+
+    console.log(`[VotingService] Advanced to next athlete: ${nextAthlete?.weight_in_info_id || 'GROUP COMPLETED'}`);
+    
+    return {
+      advanced: true,
+      nextAthleteId: nextAthlete?.weight_in_info_id || null,
+      currentRound
+    };
+
+  } catch (error) {
+    console.error('[VotingService] Error advancing:', error);
+    return { advanced: false, nextAthleteId: null, currentRound: 1 };
+  }
 }
 
 /**
@@ -75,7 +236,6 @@ export async function submitVote(
     if (!pending) {
       // Create new pending votes entry
       const timeout = setTimeout(() => {
-        // Clean up orphan votes after timeout
         pendingVotesMap.delete(voteKey);
         console.log(`[VotingService] Cleaned up orphan votes for ${voteKey}`);
       }, VOTE_TIMEOUT_MS);
@@ -93,7 +253,6 @@ export async function submitVote(
 
     // Check if voting for different attempt (new athlete)
     if (pending.attemptId !== attemptId) {
-      // Clear old votes and start fresh
       clearTimeout(pending.timeout);
       const newTimeout = setTimeout(() => {
         pendingVotesMap.delete(voteKey);
@@ -137,7 +296,7 @@ export async function submitVote(
       
       console.log(`[VotingService] All votes received! Valid: ${validVotes}, Invalid: ${invalidVotes} → Result: ${finalResult}`);
 
-      // Update database
+      // Update attempt status in database
       const { error: updateError } = await supabaseAdmin
         .from('attempts')
         .update({ status: finalResult })
@@ -154,6 +313,9 @@ export async function submitVote(
         };
       }
 
+      // ADVANCE TO NEXT ATHLETE
+      const advanceResult = await advanceToNextAthleteInternal(groupId, liftId);
+
       // Clear pending votes
       clearTimeout(pending.timeout);
       pendingVotesMap.delete(voteKey);
@@ -163,7 +325,9 @@ export async function submitVote(
         votesReceived: 3,
         totalExpected: 3,
         finalResult,
-        message: `Attempt marked as ${finalResult}`
+        advanced: advanceResult.advanced,
+        nextAthleteId: advanceResult.nextAthleteId,
+        message: `Attempt marked as ${finalResult}. ${advanceResult.nextAthleteId ? 'Next athlete ready.' : 'Group completed!'}`
       };
     }
 
@@ -178,6 +342,68 @@ export async function submitVote(
 
   } catch (error: any) {
     console.error('[VotingService] Error:', error);
+    return {
+      success: false,
+      votesReceived: 0,
+      totalExpected: 3,
+      finalResult: null,
+      error: error.message || 'Unknown error'
+    };
+  }
+}
+
+/**
+ * FORCE INVALID - Called by HEAD judge X button
+ * Immediately marks attempt as INVALID and advances
+ */
+export async function forceInvalid(
+  attemptId: number,
+  groupId: number,
+  liftId: string
+): Promise<VoteResponse> {
+  try {
+    console.log(`[VotingService] HEAD JUDGE FORCE INVALID for attempt ${attemptId}`);
+
+    // Clear any pending votes for this context
+    const voteKey = getVoteKey(groupId, liftId);
+    const pending = pendingVotesMap.get(voteKey);
+    if (pending) {
+      clearTimeout(pending.timeout);
+      pendingVotesMap.delete(voteKey);
+    }
+
+    // Update attempt status to INVALID
+    const { error: updateError } = await supabaseAdmin
+      .from('attempts')
+      .update({ status: 'INVALID' })
+      .eq('id', attemptId);
+
+    if (updateError) {
+      console.error('[VotingService] Failed to update attempt:', updateError);
+      return {
+        success: false,
+        votesReceived: 0,
+        totalExpected: 3,
+        finalResult: null,
+        error: 'Failed to save result to database'
+      };
+    }
+
+    // ADVANCE TO NEXT ATHLETE
+    const advanceResult = await advanceToNextAthleteInternal(groupId, liftId);
+
+    return {
+      success: true,
+      votesReceived: 3,  // Fake 3/3 for UI consistency
+      totalExpected: 3,
+      finalResult: 'INVALID',
+      advanced: advanceResult.advanced,
+      nextAthleteId: advanceResult.nextAthleteId,
+      message: `HEAD JUDGE: Attempt marked as INVALID. ${advanceResult.nextAthleteId ? 'Next athlete ready.' : 'Group completed!'}`
+    };
+
+  } catch (error: any) {
+    console.error('[VotingService] Force invalid error:', error);
     return {
       success: false,
       votesReceived: 0,
@@ -215,7 +441,7 @@ export function getVoteStatus(groupId: number, liftId: string): {
 }
 
 /**
- * Clear all pending votes for a context (called when advancing to next athlete)
+ * Clear all pending votes for a context
  */
 export function clearVotes(groupId: number, liftId: string): void {
   const voteKey = getVoteKey(groupId, liftId);
@@ -229,7 +455,7 @@ export function clearVotes(groupId: number, liftId: string): void {
 }
 
 /**
- * Reset a judge's vote (if they made a mistake before all votes are in)
+ * Reset a judge's vote
  */
 export function resetJudgeVote(
   groupId: number,
@@ -250,6 +476,7 @@ export function resetJudgeVote(
 
 export default {
   submitVote,
+  forceInvalid,
   getVoteStatus,
   clearVotes,
   resetJudgeVote

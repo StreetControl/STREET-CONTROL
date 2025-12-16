@@ -10,14 +10,14 @@
  * - Mobile-first responsive design
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDirectorState, getGroupAthletes } from '../../services/api';
-import { submitJudgeVote } from '../../services/api';
+import { getDirectorState, getGroupAthletes, submitJudgeVote, forceInvalidAttempt } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { ChevronLeft, Gavel, RefreshCw } from 'lucide-react';
 import { TimerDisplay, AthleteInfoCard, VotingButtons } from '../../components/judge';
+import type { TimerDisplayRef } from '../../components/judge/TimerDisplay';
 
 // Types
 interface Flight {
@@ -85,14 +85,18 @@ export default function JudgePage() {
   const [hasVoted, setHasVoted] = useState<boolean>(false);
   const [lastVote, setLastVote] = useState<boolean | null>(null);
   const [voteResult, setVoteResult] = useState<string | null>(null);
+  const [votesReceived, setVotesReceived] = useState<number>(0);
+  const [timerShouldReset, setTimerShouldReset] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+
+  // Timer ref
+  const timerRef = useRef<TimerDisplayRef>(null);
 
   // Is this judge a HEAD judge?
   const isHeadJudge = activeRole?.judge_position === 'HEAD';
   const judgePosition = activeRole?.judge_position || 'LEFT';
 
-  // Get current lift name
-  const currentLiftName = lifts.find(l => l.id === selectedLiftId)?.name || '';
+
 
   // Load initial state
   useEffect(() => {
@@ -174,6 +178,7 @@ export default function JudgePage() {
         setHasVoted(false);
         setLastVote(null);
         setVoteResult(null);
+        setVotesReceived(0);
       } else {
         setError(response.error || 'Errore nel caricamento atleti');
       }
@@ -220,6 +225,7 @@ export default function JudgePage() {
             setHasVoted(false);
             setLastVote(null);
             setVoteResult(null);
+            setVotesReceived(0);
           }
         }
       )
@@ -229,6 +235,62 @@ export default function JudgePage() {
       supabase.removeChannel(channel);
     };
   }, [selectedGroupId, selectedLiftId, athletes]);
+
+  // Subscribe to attempts changes (receive final result when all judges voted)
+  useEffect(() => {
+    if (!selectedGroupId || !selectedLiftId || !currentAthlete) return;
+
+    // Get current attempt ID
+    const round = currentState?.current_round || 1;
+    const attemptKey = `attempt${round}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const attempt = currentAthlete[attemptKey];
+    
+    if (!attempt) return;
+
+    const channel = supabase
+      .channel(`attempts_${attempt.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'attempts',
+          filter: `id=eq.${attempt.id}`
+        },
+        (payload) => {
+          console.log('[JudgePage] attempts updated:', payload.new);
+          
+          // Check if status changed to VALID or INVALID
+          if (payload.new.status === 'VALID' || payload.new.status === 'INVALID') {
+            setVoteResult(payload.new.status);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedGroupId, selectedLiftId, currentAthlete, currentState]);
+
+  // When vote result is received, stop timer and reload athletes after delay
+  useEffect(() => {
+    if (voteResult) {
+      // Stop timer immediately
+      timerRef.current?.stop();
+      setTimerShouldReset(true);
+
+      // After 1.5s delay, reload athletes to get next one
+      const timeout = setTimeout(() => {
+        loadAthletes();
+        // Reset timer for next athlete
+        timerRef.current?.reset();
+        setTimerShouldReset(false);
+      }, 1500);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [voteResult]);
 
   // Handlers
   const handleFlightChange = (flightId: number) => {
@@ -279,6 +341,7 @@ export default function JudgePage() {
       if (response.success) {
         setHasVoted(true);
         setLastVote(isValid);
+        setVotesReceived(response.votesReceived || 0);
 
         if (response.finalResult) {
           setVoteResult(response.finalResult);
@@ -300,6 +363,45 @@ export default function JudgePage() {
       handleVote(false);
     }
   }, [hasVoted, currentAthlete, handleVote]);
+
+  // HEAD Judge X Button - Force INVALID immediately
+  const handleForceInvalid = useCallback(async () => {
+    if (!currentAthlete || !selectedGroupId || !selectedLiftId) return;
+
+    // Get current attempt ID
+    const round = currentState?.current_round || 1;
+    const attemptKey = `attempt${round}` as 'attempt1' | 'attempt2' | 'attempt3';
+    const attempt = currentAthlete[attemptKey];
+
+    if (!attempt) {
+      setError('Nessun tentativo attivo per questo atleta');
+      return;
+    }
+
+    try {
+      setVoting(true);
+      setError('');
+
+      const response = await forceInvalidAttempt({
+        attemptId: attempt.id,
+        groupId: selectedGroupId,
+        liftId: selectedLiftId
+      });
+
+      if (response.success) {
+        setHasVoted(true);
+        setLastVote(false);
+        setVoteResult('INVALID');
+      } else {
+        setError(response.error || 'Errore nel forzare non valido');
+      }
+    } catch (err: any) {
+      console.error('Error force invalid:', err);
+      setError(err.response?.data?.error || 'Errore di connessione');
+    } finally {
+      setVoting(false);
+    }
+  }, [currentAthlete, selectedGroupId, selectedLiftId, currentState]);
 
   const selectedFlight = flights.find(f => f.id === selectedFlightId);
   const availableGroups = selectedFlight?.groups || [];
@@ -417,8 +519,11 @@ export default function JudgePage() {
         {/* Timer - HEAD Judge Only */}
         {isHeadJudge && (
           <TimerDisplay 
+            ref={timerRef}
             defaultSeconds={60}
             onTimeExpired={handleTimerExpired}
+            onInvalidate={handleForceInvalid}
+            shouldReset={timerShouldReset}
           />
         )}
 
@@ -427,20 +532,12 @@ export default function JudgePage() {
           <AthleteInfoCard
             firstName=""
             lastName=""
-            weightCategory=""
-            liftName=""
-            attemptNumber={1}
-            weightKg={null}
             isLoading={true}
           />
         ) : currentAthlete ? (
           <AthleteInfoCard
             firstName={currentAthlete.first_name}
             lastName={currentAthlete.last_name}
-            weightCategory={currentAthlete.weight_category}
-            liftName={currentLiftName}
-            attemptNumber={currentRound}
-            weightKg={currentAttempt?.weight_kg || null}
           />
         ) : currentState?.completed ? (
           <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-6 text-center">
@@ -454,7 +551,23 @@ export default function JudgePage() {
           </div>
         )}
 
-        {/* Vote Result Banner */}
+
+
+        {/* Voting Buttons */}
+        {currentAthlete && !currentState?.completed && !voteResult && (
+          <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-6">
+            <VotingButtons
+              onVote={handleVote}
+              disabled={voting || !currentAttempt}
+              hasVoted={hasVoted}
+              lastVote={lastVote}
+              voteResult={voteResult}
+              votesReceived={votesReceived}
+            />
+          </div>
+        )}
+
+        {/* Vote Result Banner (shown separately when voting is complete) */}
         {voteResult && (
           <div className={`
             rounded-xl p-4 text-center font-bold text-xl
@@ -463,18 +576,6 @@ export default function JudgePage() {
               : 'bg-red-500/20 border-2 border-red-500 text-red-400'}
           `}>
             {voteResult === 'VALID' ? '✓ PROVA VALIDA' : '✗ PROVA NON VALIDA'}
-          </div>
-        )}
-
-        {/* Voting Buttons */}
-        {currentAthlete && !currentState?.completed && (
-          <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-6">
-            <VotingButtons
-              onVote={handleVote}
-              disabled={voting || !currentAttempt}
-              hasVoted={hasVoted}
-              lastVote={lastVote}
-            />
           </div>
         )}
       </main>
