@@ -26,86 +26,90 @@ function App() {
     <Router>
       <Routes>
         {/* Public Routes */}
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={
             isAuthenticated ? (
               <Navigate to="/select-role" replace />
             ) : (
               <LoginPage />
             )
-          } 
+          }
         />
 
         {/* Role Selection (requires auth but no active role) */}
-        <Route 
-          path="/select-role" 
+        <Route
+          path="/select-role"
           element={
             <ProtectedRoute>
               <SelectRolePage />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* MEETS Routes - All roles access this */}
-        <Route 
-          path="/meets" 
+        <Route
+          path="/meets"
           element={
             <ProtectedRoute requireActiveRole>
               <MeetListPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* MEET SETTINGS Route - Only ORGANIZER can create/configure meets */}
-        <Route 
-          path="/meets/new" 
+        <Route
+          path="/meets/new"
           element={
             <ProtectedRoute requireActiveRole>
               <MeetSettingsPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* MEET SETTINGS Route with ID - Edit existing meet */}
-        <Route 
-          path="/meets/:meetId/settings" 
+        <Route
+          path="/meets/:meetId/settings"
           element={
             <ProtectedRoute requireActiveRole>
               <MeetSettingsPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* DIRECTOR Route - Competition management */}
-        <Route 
-          path="/meets/:meetId/director" 
+        <Route
+          path="/meets/:meetId/director"
           element={
             <ProtectedRoute requireActiveRole requireRole="DIRECTOR">
               <DirectorPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* JUDGE Route - Voting page for referees */}
-        <Route 
-          path="/meets/:meetId/judge" 
+        <Route
+          path="/meets/:meetId/judge"
           element={
             <ProtectedRoute requireActiveRole requireRole="REFEREE">
               <JudgePage />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        {/* DISPLAY Routes - Public (no auth required) */}
-        <Route 
-          path="/display/:meetId/votes" 
-          element={<VoteResultDisplay />} 
+        {/* DISPLAY Routes - Requires authentication */}
+        <Route
+          path="/display/:meetId/votes"
+          element={
+            <ProtectedRoute requireActiveRole>
+              <VoteResultDisplay />
+            </ProtectedRoute>
+          }
         />
 
         {/* Default Route */}
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             isAuthenticated ? (
               hasActiveRole ? (
@@ -117,13 +121,13 @@ function App() {
             ) : (
               <Navigate to="/login" replace />
             )
-          } 
+          }
         />
 
         {/* 404 - Catch all */}
-        <Route 
-          path="*" 
-          element={<Navigate to="/" replace />} 
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
         />
       </Routes>
     </Router>

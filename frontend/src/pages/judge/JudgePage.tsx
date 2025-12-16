@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDirectorState, getGroupAthletes, submitJudgeVote, forceInvalidAttempt } from '../../services/api';
+import { getDirectorState, getGroupAthletes, submitJudgeVote, forceInvalidAttempt, broadcastTimerStart } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { ChevronLeft, Gavel, RefreshCw } from 'lucide-react';
 import { TimerDisplay, AthleteInfoCard, VotingButtons } from '../../components/judge';
@@ -70,15 +70,15 @@ export default function JudgePage() {
   const [meetName, setMeetName] = useState<string>('');
   const [flights, setFlights] = useState<Flight[]>([]);
   const [lifts, setLifts] = useState<Lift[]>([]);
-  
+
   const [selectedFlightId, setSelectedFlightId] = useState<number | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedLiftId, setSelectedLiftId] = useState<string | null>(null);
-  
+
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [currentState, setCurrentState] = useState<CurrentState | null>(null);
   const [currentAthlete, setCurrentAthlete] = useState<Athlete | null>(null);
-  
+
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingAthletes, setLoadingAthletes] = useState<boolean>(false);
   const [voting, setVoting] = useState<boolean>(false);
@@ -108,9 +108,9 @@ export default function JudgePage() {
     try {
       setLoading(true);
       setError('');
-      
+
       const response = await getDirectorState(parseInt(meetId!));
-      
+
       if (response.success) {
         setMeetName(response.meet.name);
         setFlights(response.flights);
@@ -163,7 +163,7 @@ export default function JudgePage() {
       if (response.success) {
         setAthletes(response.athletes);
         setCurrentState(response.currentState || null);
-        
+
         // Find current athlete
         if (response.currentState?.current_weight_in_info_id) {
           const athlete = response.athletes.find(
@@ -206,7 +206,7 @@ export default function JudgePage() {
         },
         (payload) => {
           console.log('[JudgePage] current_state updated:', payload.new);
-          
+
           // Only update if it's for our lift
           if (payload.new.lift_id === selectedLiftId) {
             setCurrentState({
@@ -244,7 +244,7 @@ export default function JudgePage() {
     const round = currentState?.current_round || 1;
     const attemptKey = `attempt${round}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attempt = currentAthlete[attemptKey];
-    
+
     if (!attempt) return;
 
     const channel = supabase
@@ -259,7 +259,7 @@ export default function JudgePage() {
         },
         (payload) => {
           console.log('[JudgePage] attempts updated:', payload.new);
-          
+
           // Check if status changed to VALID or INVALID
           if (payload.new.status === 'VALID' || payload.new.status === 'INVALID') {
             setVoteResult(payload.new.status);
@@ -295,7 +295,7 @@ export default function JudgePage() {
   // Handlers
   const handleFlightChange = (flightId: number) => {
     setSelectedFlightId(flightId);
-    
+
     const flight = flights.find(f => f.id === flightId);
     if (flight && flight.groups.length > 0) {
       setSelectedGroupId(flight.groups[0].id);
@@ -335,7 +335,8 @@ export default function JudgePage() {
         judgePosition: judgePosition as 'HEAD' | 'LEFT' | 'RIGHT',
         vote: isValid,
         groupId: selectedGroupId,
-        liftId: selectedLiftId
+        liftId: selectedLiftId,
+        meetId: parseInt(meetId!)
       });
 
       if (response.success) {
@@ -385,7 +386,8 @@ export default function JudgePage() {
       const response = await forceInvalidAttempt({
         attemptId: attempt.id,
         groupId: selectedGroupId,
-        liftId: selectedLiftId
+        liftId: selectedLiftId,
+        meetId: parseInt(meetId!)
       });
 
       if (response.success) {
@@ -402,6 +404,23 @@ export default function JudgePage() {
       setVoting(false);
     }
   }, [currentAthlete, selectedGroupId, selectedLiftId, currentState]);
+
+  // Handle timer start - broadcast to display screens
+  const handleTimerStart = useCallback(async (seconds: number) => {
+    if (!meetId || !selectedGroupId || !selectedLiftId) return;
+
+    try {
+      await broadcastTimerStart({
+        meetId: parseInt(meetId),
+        groupId: selectedGroupId,
+        liftId: selectedLiftId,
+        seconds
+      });
+      console.log('[JudgePage] Timer start broadcasted');
+    } catch (err) {
+      console.error('[JudgePage] Failed to broadcast timer:', err);
+    }
+  }, [meetId, selectedGroupId, selectedLiftId]);
 
   const selectedFlight = flights.find(f => f.id === selectedFlightId);
   const availableGroups = selectedFlight?.groups || [];
@@ -518,11 +537,12 @@ export default function JudgePage() {
 
         {/* Timer - HEAD Judge Only */}
         {isHeadJudge && (
-          <TimerDisplay 
+          <TimerDisplay
             ref={timerRef}
             defaultSeconds={60}
             onTimeExpired={handleTimerExpired}
             onInvalidate={handleForceInvalid}
+            onTimerStart={handleTimerStart}
             shouldReset={timerShouldReset}
           />
         )}
@@ -571,8 +591,8 @@ export default function JudgePage() {
         {voteResult && (
           <div className={`
             rounded-xl p-4 text-center font-bold text-xl
-            ${voteResult === 'VALID' 
-              ? 'bg-green-500/20 border-2 border-green-500 text-green-400' 
+            ${voteResult === 'VALID'
+              ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
               : 'bg-red-500/20 border-2 border-red-500 text-red-400'}
           `}>
             {voteResult === 'VALID' ? '✓ PROVA VALIDA' : '✗ PROVA NON VALIDA'}

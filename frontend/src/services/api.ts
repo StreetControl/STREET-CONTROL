@@ -65,11 +65,11 @@ api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Use in-memory token (fallback to localStorage for backwards compatibility)
     const token = currentToken || localStorage.getItem('authToken');
-    
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     return config;
   },
   (error: AxiosError) => {
@@ -90,12 +90,12 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
-    
+
     // Server error
     if (error.response?.status && error.response.status >= 500) {
       console.error('Server error:', error.response);
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -113,6 +113,19 @@ export async function submitVote(data: SubmitVoteRequest): Promise<SubmitVoteRes
 }
 
 /**
+ * Broadcast timer start to display screens
+ */
+export async function broadcastTimerStart(data: {
+  meetId: number;
+  groupId: number;
+  liftId: string;
+  seconds: number;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  const response = await api.post('/votes/timer-start', data);
+  return response.data;
+}
+
+/**
  * Submit judge vote (new interface for JudgePage)
  */
 export async function submitJudgeVote(data: {
@@ -121,9 +134,10 @@ export async function submitJudgeVote(data: {
   vote: boolean;
   groupId: number;
   liftId: string;
-}): Promise<{ 
-  success: boolean; 
-  votesReceived: number; 
+  meetId: number;  // For broadcast to display screens
+}): Promise<{
+  success: boolean;
+  votesReceived: number;
   totalExpected: number;
   finalResult: string | null;
   message?: string;
@@ -141,9 +155,10 @@ export async function forceInvalidAttempt(data: {
   attemptId: number;
   groupId: number;
   liftId: string;
-}): Promise<{ 
-  success: boolean; 
-  votesReceived: number; 
+  meetId: number;  // For broadcast to display screens
+}): Promise<{
+  success: boolean;
+  votesReceived: number;
   totalExpected: number;
   finalResult: string | null;
   message?: string;
@@ -239,11 +254,11 @@ export async function addAthleteToMeet(meetId: number, athleteData: {
  * Bulk import athletes from CSV
  */
 export async function bulkImportAthletes(
-  meetId: number, 
+  meetId: number,
   data: BulkCreateAthletesRequest
 ): Promise<BulkCreateAthletesResponse> {
   const response = await api.post<BulkCreateAthletesResponse>(
-    `/meets/${meetId}/athletes/bulk`, 
+    `/meets/${meetId}/athletes/bulk`,
     data
   );
   return response.data;
@@ -283,7 +298,7 @@ export async function addAthlete(athleteData: AddAthleteRequest): Promise<AddAth
  */
 export async function updateAthleteWeight(data: UpdateAthleteWeightRequest): Promise<UpdateAthleteWeightResponse> {
   const response = await api.patch<UpdateAthleteWeightResponse>(
-    `/athletes/${data.athlete_id}/weight`, 
+    `/athletes/${data.athlete_id}/weight`,
     { body_weight: data.body_weight }
   );
   return response.data;
@@ -357,7 +372,7 @@ export async function getWeighInAthletes(meetId: number): Promise<import('../typ
  * Update weigh-in data and openers for a specific athlete
  */
 export async function updateWeighIn(
-  nominationId: number, 
+  nominationId: number,
   data: import('../types').UpdateWeighInRequest
 ): Promise<import('../types').UpdateWeighInResponse> {
   const response = await api.patch<import('../types').UpdateWeighInResponse>(`/weigh-in/${nominationId}`, data);

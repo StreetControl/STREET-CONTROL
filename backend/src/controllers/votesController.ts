@@ -16,12 +16,14 @@ interface SubmitVoteBody {
   vote: boolean;  // true = VALID, false = INVALID
   groupId: number;
   liftId: string;
+  meetId: number;  // For broadcast to display screens
 }
 
 interface ForceInvalidBody {
   attemptId: number;
   groupId: number;
   liftId: string;
+  meetId: number;  // For broadcast to display screens
 }
 
 /**
@@ -30,7 +32,7 @@ interface ForceInvalidBody {
  */
 export async function submitVoteHandler(req: AuthRequest, res: Response): Promise<Response> {
   try {
-    const { attemptId, judgePosition, vote, groupId, liftId } = req.body as SubmitVoteBody;
+    const { attemptId, judgePosition, vote, groupId, liftId, meetId } = req.body as SubmitVoteBody;
 
     // Validation
     if (!attemptId || typeof attemptId !== 'number') {
@@ -68,8 +70,15 @@ export async function submitVoteHandler(req: AuthRequest, res: Response): Promis
       });
     }
 
+    if (!meetId || typeof meetId !== 'number') {
+      return res.status(400).json({
+        success: false,
+        error: 'meetId is required and must be a number'
+      });
+    }
+
     // Submit vote to voting service
-    const result = await submitVote(attemptId, judgePosition, vote, groupId, liftId);
+    const result = await submitVote(attemptId, judgePosition, vote, groupId, liftId, meetId);
 
     if (!result.success) {
       return res.status(400).json(result);
@@ -92,7 +101,7 @@ export async function submitVoteHandler(req: AuthRequest, res: Response): Promis
  */
 export async function forceInvalidHandler(req: AuthRequest, res: Response): Promise<Response> {
   try {
-    const { attemptId, groupId, liftId } = req.body as ForceInvalidBody;
+    const { attemptId, groupId, liftId, meetId } = req.body as ForceInvalidBody;
 
     // Validation
     if (!attemptId || typeof attemptId !== 'number') {
@@ -116,8 +125,15 @@ export async function forceInvalidHandler(req: AuthRequest, res: Response): Prom
       });
     }
 
+    if (!meetId || typeof meetId !== 'number') {
+      return res.status(400).json({
+        success: false,
+        error: 'meetId is required and must be a number'
+      });
+    }
+
     // Force invalid via voting service
-    const result = await forceInvalid(attemptId, groupId, liftId);
+    const result = await forceInvalid(attemptId, groupId, liftId, meetId);
 
     if (!result.success) {
       return res.status(400).json(result);

@@ -87,12 +87,11 @@ const MeetListPage = () => {
     navigate('/select-role');
   };
 
-  // Open display in new window
+  // Open display in new tab
   const handleOpenDisplay = (meetId: number, displayType: 'votes') => {
-    // For now, we need groupId and liftId - use defaults or prompt user
-    // This will be improved later with a selection modal
-    const url = `/display/${meetId}/${displayType}?groupId=61&liftId=MU`;
-    window.open(url, `display_${displayType}_${meetId}`, 'width=1920,height=1080');
+    // Opens in a new tab - the display page will sync with current_state via Supabase Realtime
+    const url = `/display/${meetId}/${displayType}`;
+    window.open(url, '_blank');
   };
 
   // Format date to Italian format

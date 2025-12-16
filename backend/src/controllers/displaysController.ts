@@ -150,6 +150,190 @@ export async function getCurrentAttempt(req: AuthRequest, res: Response): Promis
   }
 }
 
+/**
+ * GET /api/displays/:meetId/active-athlete
+ * Scans all groups in the meet to find the currently active athlete
+ * 
+ * This endpoint doesn't require groupId/liftId - it finds them automatically
+ * Perfect for display screens that need to show whoever is currently on platform
+ */
+export async function getActiveAthlete(req: AuthRequest, res: Response): Promise<Response> {
+  try {
+    const { meetId } = req.params;
+
+    if (!meetId) {
+      return res.status(400).json({
+        success: false,
+        error: 'meetId is required'
+      });
+    }
+
+    // Get all groups for this meet
+    const { data: flights, error: flightsError } = await supabaseAdmin
+      .from('flights')
+      .select(`
+        id,
+        groups (
+          id
+        )
+      `)
+      .eq('meet_id', parseInt(meetId));
+
+    if (flightsError) {
+      console.error('Error fetching flights:', flightsError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch flights'
+      });
+    }
+
+    // Flatten groups
+    const allGroups: number[] = [];
+    flights?.forEach((flight: any) => {
+      flight.groups?.forEach((group: any) => {
+        allGroups.push(group.id);
+      });
+    });
+
+    if (allGroups.length === 0) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No groups found for this meet'
+      });
+    }
+
+    // Get all current_state entries that have an active athlete
+    const { data: activeStates, error: statesError } = await supabaseAdmin
+      .from('current_state')
+      .select('*')
+      .in('group_id', allGroups)
+      .not('current_weight_in_info_id', 'is', null)
+      .eq('completed', false);
+
+    if (statesError) {
+      console.error('Error fetching current_state:', statesError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch current state'
+      });
+    }
+
+    // If no active state found
+    if (!activeStates || activeStates.length === 0) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No active athlete on platform'
+      });
+    }
+
+    // Use the first active state found
+    const activeState = activeStates[0];
+    const groupId = activeState.group_id;
+    const liftId = activeState.lift_id;
+    const currentRound = activeState.current_attempt_no || 1;
+
+    // Get weight_in_info with athlete details
+    const { data: weightInInfo, error: wiiError } = await supabaseAdmin
+      .from('weight_in_info')
+      .select(`
+        id,
+        bodyweight_kg,
+        nomination:nomination_id (
+          id,
+          form_info:form_id (
+            athlete:athlete_id (
+              id,
+              first_name,
+              last_name,
+              sex
+            ),
+            weight_category:weight_cat_id (
+              name
+            )
+          )
+        )
+      `)
+      .eq('id', activeState.current_weight_in_info_id)
+      .single();
+
+    if (wiiError || !weightInInfo) {
+      console.error('Error fetching weight_in_info:', wiiError);
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Could not fetch athlete details'
+      });
+    }
+
+    // Get current attempt
+    const { data: attempt } = await supabaseAdmin
+      .from('attempts')
+      .select('id, weight_kg, status, attempt_no')
+      .eq('weight_in_info_id', activeState.current_weight_in_info_id)
+      .eq('lift_id', liftId)
+      .eq('attempt_no', currentRound)
+      .maybeSingle();
+
+    // Get lift name
+    const { data: lift } = await supabaseAdmin
+      .from('lifts')
+      .select('id, name')
+      .eq('id', liftId)
+      .single();
+
+    // Extract nested data safely
+    const nomination = weightInInfo.nomination as any;
+    const formInfo = nomination?.form_info;
+    const athlete = formInfo?.athlete;
+    const weightCategory = formInfo?.weight_category;
+
+    if (!athlete) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'Athlete data not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        athlete: {
+          id: athlete.id,
+          firstName: athlete.first_name || '',
+          lastName: athlete.last_name || '',
+          sex: athlete.sex || '',
+          weightCategory: weightCategory?.name || '',
+          bodyweightKg: weightInInfo.bodyweight_kg
+        },
+        attempt: attempt ? {
+          id: attempt.id,
+          weightKg: attempt.weight_kg,
+          attemptNo: attempt.attempt_no,
+          status: attempt.status
+        } : null,
+        lift: {
+          id: liftId,
+          name: lift?.name || liftId
+        },
+        currentRound,
+        groupId,
+        completed: activeState.completed
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Error in getActiveAthlete:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+}
+
 export default {
-  getCurrentAttempt
+  getCurrentAttempt,
+  getActiveAthlete
 };

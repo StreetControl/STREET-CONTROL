@@ -4,13 +4,18 @@
  * Manages judge votes IN MEMORY (not persisted in DB).
  * Implements 2/3 voting logic: 2 valid votes = VALID, 2 invalid = INVALID
  * 
+ * REALTIME BROADCAST:
+ * When a judge votes, we broadcast the vote to all display screens
+ * using Supabase Realtime Broadcast - no DB storage needed.
+ * 
  * Flow:
  * 1. Judge submits vote via submitVote()
  * 2. Vote stored in memory Map
- * 3. When 3 votes received → calculate result
- * 4. Update attempts.status in DB
- * 5. Advance to next athlete (update current_state)
- * 6. Clear votes from memory
+ * 3. BROADCAST vote to display screens immediately
+ * 4. When 3 votes received → calculate result
+ * 5. Update attempts.status in DB
+ * 6. Advance to next athlete (update current_state)
+ * 7. Clear votes from memory
  */
 
 import { supabaseAdmin } from './supabase.js';
@@ -47,6 +52,108 @@ const pendingVotesMap = new Map<string, PendingVotes>();
 const VOTE_TIMEOUT_MS = 60000;
 
 /**
+ * BROADCAST a vote to display screens
+ * Uses Supabase Realtime Broadcast - no DB storage
+ */
+async function broadcastVote(
+  meetId: number,
+  groupId: number,
+  liftId: string,
+  judgePosition: JudgePosition,
+  vote: boolean,
+  votesReceived: number,
+  allVotes: Map<JudgePosition, boolean>
+): Promise<void> {
+  const channelName = `display_votes_${meetId}`;
+
+  const votesObject: Record<JudgePosition, boolean | null> = {
+    HEAD: allVotes.has('HEAD') ? allVotes.get('HEAD')! : null,
+    LEFT: allVotes.has('LEFT') ? allVotes.get('LEFT')! : null,
+    RIGHT: allVotes.has('RIGHT') ? allVotes.get('RIGHT')! : null
+  };
+
+  const channel = supabaseAdmin.channel(channelName);
+
+  await channel.send({
+    type: 'broadcast',
+    event: 'judge_vote',
+    payload: {
+      groupId,
+      liftId,
+      judgePosition,
+      vote,
+      votesReceived,
+      totalExpected: 3,
+      votes: votesObject,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  console.log(`[VotingService] Broadcasted vote: ${judgePosition} = ${vote ? 'VALID' : 'INVALID'}`);
+}
+
+/**
+ * BROADCAST timer started event
+ */
+export async function broadcastTimerStarted(
+  meetId: number,
+  groupId: number,
+  liftId: string,
+  seconds: number
+): Promise<void> {
+  const channelName = `display_votes_${meetId}`;
+  const channel = supabaseAdmin.channel(channelName);
+
+  await channel.send({
+    type: 'broadcast',
+    event: 'timer_started',
+    payload: {
+      groupId,
+      liftId,
+      seconds,
+      startedAt: new Date().toISOString()
+    }
+  });
+
+  console.log(`[VotingService] Broadcasted timer started: ${seconds}s`);
+}
+
+/**
+ * BROADCAST final result
+ */
+async function broadcastFinalResult(
+  meetId: number,
+  groupId: number,
+  liftId: string,
+  result: VoteResult,
+  votes: Map<JudgePosition, boolean>
+): Promise<void> {
+  const channelName = `display_votes_${meetId}`;
+
+  const votesObject: Record<JudgePosition, boolean | null> = {
+    HEAD: votes.has('HEAD') ? votes.get('HEAD')! : null,
+    LEFT: votes.has('LEFT') ? votes.get('LEFT')! : null,
+    RIGHT: votes.has('RIGHT') ? votes.get('RIGHT')! : null
+  };
+
+  const channel = supabaseAdmin.channel(channelName);
+
+  await channel.send({
+    type: 'broadcast',
+    event: 'final_result',
+    payload: {
+      groupId,
+      liftId,
+      result,
+      votes: votesObject,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  console.log(`[VotingService] Broadcasted final result: ${result}`);
+}
+
+/**
  * Generate unique key for vote context
  */
 function getVoteKey(groupId: number, liftId: string): string {
@@ -61,17 +168,17 @@ function sortAthletesByAttemptWeight(athletes: any[], attemptNo: number): any[] 
     const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
     const attemptA = a[attemptKey];
     const attemptB = b[attemptKey];
-    
+
     const weightA = attemptA?.weight_kg;
     const weightB = attemptB?.weight_kg;
-    
+
     // null/undefined weights go last
     if (weightA === null || weightA === undefined) return 1;
     if (weightB === null || weightB === undefined) return -1;
-    
+
     // Sort by weight ascending
     if (weightA !== weightB) return weightA - weightB;
-    
+
     // Tie-breaker: higher bodyweight goes first
     return (b.bodyweight_kg || 0) - (a.bodyweight_kg || 0);
   });
@@ -83,7 +190,7 @@ function sortAthletesByAttemptWeight(athletes: any[], attemptNo: number): any[] 
 function findNextAthleteForRound(athletes: any[], attemptNo: number): any | null {
   const attemptKey = `attempt${attemptNo}` as 'attempt1' | 'attempt2' | 'attempt3';
   const sorted = sortAthletesByAttemptWeight(athletes, attemptNo);
-  
+
   for (const athlete of sorted) {
     const attempt = athlete[attemptKey];
     if (!attempt || attempt.status === 'PENDING') {
@@ -126,7 +233,7 @@ async function advanceToNextAthleteInternal(groupId: number, liftId: string): Pr
     }
 
     const nomIds = nominations.map(n => n.id);
-    
+
     // Get weight_in_info for all nominations
     const { data: weighInInfos } = await supabaseAdmin
       .from('weight_in_info')
@@ -198,7 +305,7 @@ async function advanceToNextAthleteInternal(groupId: number, liftId: string): Pr
     }
 
     console.log(`[VotingService] Advanced to next athlete: ${nextAthlete?.weight_in_info_id || 'GROUP COMPLETED'}`);
-    
+
     return {
       advanced: true,
       nextAthleteId: nextAthlete?.weight_in_info_id || null,
@@ -219,20 +326,22 @@ async function advanceToNextAthleteInternal(groupId: number, liftId: string): Pr
  * @param vote - true for VALID, false for INVALID
  * @param groupId - Current group ID
  * @param liftId - Current lift ID
+ * @param meetId - Meet ID (for broadcast)
  */
 export async function submitVote(
   attemptId: number,
   judgePosition: JudgePosition,
   vote: boolean,
   groupId: number,
-  liftId: string
+  liftId: string,
+  meetId: number
 ): Promise<VoteResponse> {
   try {
     const voteKey = getVoteKey(groupId, liftId);
-    
+
     // Get or create pending votes for this context
     let pending = pendingVotesMap.get(voteKey);
-    
+
     if (!pending) {
       // Create new pending votes entry
       const timeout = setTimeout(() => {
@@ -282,19 +391,33 @@ export async function submitVote(
 
     // Record the vote
     pending.votes.set(judgePosition, vote);
-    
+
     console.log(`[VotingService] Vote received: ${judgePosition} = ${vote ? 'VALID' : 'INVALID'} for attempt ${attemptId}`);
     console.log(`[VotingService] Votes so far: ${pending.votes.size}/3`);
+
+    // BROADCAST the vote to display screens immediately
+    try {
+      await broadcastVote(meetId, groupId, liftId, judgePosition, vote, pending.votes.size, pending.votes);
+    } catch (broadcastError) {
+      console.error('[VotingService] Broadcast error (non-fatal):', broadcastError);
+    }
 
     // Check if we have all 3 votes
     if (pending.votes.size === 3) {
       // Calculate result (2/3 majority)
       const validVotes = Array.from(pending.votes.values()).filter(v => v === true).length;
       const invalidVotes = 3 - validVotes;
-      
+
       const finalResult: VoteResult = validVotes >= 2 ? 'VALID' : 'INVALID';
-      
+
       console.log(`[VotingService] All votes received! Valid: ${validVotes}, Invalid: ${invalidVotes} → Result: ${finalResult}`);
+
+      // BROADCAST final result to display screens
+      try {
+        await broadcastFinalResult(meetId, groupId, liftId, finalResult, pending.votes);
+      } catch (broadcastError) {
+        console.error('[VotingService] Broadcast error (non-fatal):', broadcastError);
+      }
 
       // Update attempt status in database
       const { error: updateError } = await supabaseAdmin
@@ -359,7 +482,8 @@ export async function submitVote(
 export async function forceInvalid(
   attemptId: number,
   groupId: number,
-  liftId: string
+  liftId: string,
+  meetId: number
 ): Promise<VoteResponse> {
   try {
     console.log(`[VotingService] HEAD JUDGE FORCE INVALID for attempt ${attemptId}`);
@@ -387,6 +511,17 @@ export async function forceInvalid(
         finalResult: null,
         error: 'Failed to save result to database'
       };
+    }
+
+    // BROADCAST force invalid result to display screens
+    try {
+      const forceInvalidVotes = new Map<JudgePosition, boolean>();
+      forceInvalidVotes.set('HEAD', false);
+      forceInvalidVotes.set('LEFT', false);
+      forceInvalidVotes.set('RIGHT', false);
+      await broadcastFinalResult(meetId, groupId, liftId, 'INVALID', forceInvalidVotes);
+    } catch (broadcastError) {
+      console.error('[VotingService] Broadcast error (non-fatal):', broadcastError);
     }
 
     // ADVANCE TO NEXT ATHLETE
@@ -424,7 +559,7 @@ export function getVoteStatus(groupId: number, liftId: string): {
 } {
   const voteKey = getVoteKey(groupId, liftId);
   const pending = pendingVotesMap.get(voteKey);
-  
+
   if (!pending) {
     return {
       hasVotes: false,
@@ -446,7 +581,7 @@ export function getVoteStatus(groupId: number, liftId: string): {
 export function clearVotes(groupId: number, liftId: string): void {
   const voteKey = getVoteKey(groupId, liftId);
   const pending = pendingVotesMap.get(voteKey);
-  
+
   if (pending) {
     clearTimeout(pending.timeout);
     pendingVotesMap.delete(voteKey);
@@ -464,7 +599,7 @@ export function resetJudgeVote(
 ): boolean {
   const voteKey = getVoteKey(groupId, liftId);
   const pending = pendingVotesMap.get(voteKey);
-  
+
   if (!pending || !pending.votes.has(judgePosition)) {
     return false;
   }

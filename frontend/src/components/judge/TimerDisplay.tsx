@@ -7,6 +7,7 @@
  * - Start/Stop/Reset controls
  * - X button to invalidate attempt (fuori tempo)
  * - Auto-reset when shouldReset prop changes to true
+ * - Broadcasts timer start to display screens
  */
 
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
@@ -16,6 +17,7 @@ interface TimerDisplayProps {
   defaultSeconds?: number;
   onTimeExpired?: () => void;
   onInvalidate?: () => void;  // Called when X button is pressed
+  onTimerStart?: (seconds: number) => void;  // Called when timer is started (for broadcast)
   shouldReset?: boolean;  // When true, reset timer
 }
 
@@ -24,10 +26,11 @@ export interface TimerDisplayRef {
   stop: () => void;
 }
 
-const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({ 
+const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({
   defaultSeconds = 60,
   onTimeExpired,
   onInvalidate,
+  onTimerStart,
   shouldReset = false
 }, ref) => {
   const [seconds, setSeconds] = useState(defaultSeconds);
@@ -70,8 +73,10 @@ const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({
     if (seconds > 0) {
       setIsRunning(true);
       setHasExpired(false);
+      // Broadcast timer start
+      onTimerStart?.(seconds);
     }
-  }, [seconds]);
+  }, [seconds, onTimerStart]);
 
   const handleStop = useCallback(() => {
     setIsRunning(false);
@@ -154,7 +159,7 @@ const TimerDisplay = forwardRef<TimerDisplayRef, TimerDisplayProps>(({
             <Pause className="w-5 h-5" />
           </button>
         )}
-        
+
         {/* Reset Button */}
         <button
           onClick={handleReset}
