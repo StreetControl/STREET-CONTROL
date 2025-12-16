@@ -17,6 +17,7 @@ import divisionRoutes from './routes/division.js';
 import weighInRoutes from './routes/weighIn.js';
 import directorRoutes from './routes/director.js';
 import votesRoutes from './routes/votes.js';
+import displaysRoutes from './routes/displays.js';
 
 // Load environment variables
 dotenv.config();
@@ -123,6 +124,9 @@ app.use('/api/director', directorRoutes);
 
 // Votes routes (judges)
 app.use('/api/votes', votesRoutes);
+
+// Display routes (public, no auth required)
+app.use('/api/displays', displaysRoutes);
 
 // ============================================
 // ERROR HANDLING

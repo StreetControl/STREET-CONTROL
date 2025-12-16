@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMeets } from '../services/api';
-import { Calendar, LogOut, Plus, Flag, ChevronRight } from 'lucide-react';
+import { Calendar, LogOut, Plus, Flag, ChevronRight, Monitor } from 'lucide-react';
 import type { Meet } from '../types';
 
 const MeetListPage = () => {
@@ -31,6 +31,10 @@ const MeetListPage = () => {
 
   // Check if user is Organizer
   const isOrganizer = activeRole?.role === 'ORGANIZER';
+  const isDirector = activeRole?.role === 'DIRECTOR';
+  
+  // Can open display pages (DIRECTOR or ORGANIZER only)
+  const canOpenDisplays = isDirector || isOrganizer;
 
   useEffect(() => {
     fetchMeets();
@@ -81,6 +85,14 @@ const MeetListPage = () => {
     // Clear active role before navigating to select-role page
     clearActiveRole();
     navigate('/select-role');
+  };
+
+  // Open display in new window
+  const handleOpenDisplay = (meetId: number, displayType: 'votes') => {
+    // For now, we need groupId and liftId - use defaults or prompt user
+    // This will be improved later with a selection modal
+    const url = `/display/${meetId}/${displayType}?groupId=61&liftId=MU`;
+    window.open(url, `display_${displayType}_${meetId}`, 'width=1920,height=1080');
   };
 
   // Format date to Italian format
@@ -248,7 +260,22 @@ const MeetListPage = () => {
                                 </span>
                               </div>
                             </div>
-                            <ChevronRight className="w-6 h-6 text-primary group-hover:brightness-125 transition-all" />
+                            <div className="flex items-center gap-2">
+                              {/* Display Button - DIRECTOR/ORGANIZER only */}
+                              {canOpenDisplays && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDisplay(meet.id, 'votes');
+                                  }}
+                                  className="p-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 hover:border-purple-500 transition-all"
+                                  title="Apri display voti"
+                                >
+                                  <Monitor className="w-5 h-5" />
+                                </button>
+                              )}
+                              <ChevronRight className="w-6 h-6 text-primary group-hover:brightness-125 transition-all" />
+                            </div>
                           </div>
                         </button>
                       ))}

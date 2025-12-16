@@ -16,6 +16,9 @@ import MeetSettingsPage from './pages/organizer/MeetSettingsPage';
 import DirectorPage from './pages/director/DirectorPage';
 import JudgePage from './pages/judge/JudgePage';
 
+// Display Pages (Public - No Auth)
+import { VoteResultDisplay } from './pages/displays';
+
 function App() {
   const { isAuthenticated, hasActiveRole } = useAuth();
 
@@ -92,6 +95,12 @@ function App() {
               <JudgePage />
             </ProtectedRoute>
           } 
+        />
+
+        {/* DISPLAY Routes - Public (no auth required) */}
+        <Route 
+          path="/display/:meetId/votes" 
+          element={<VoteResultDisplay />} 
         />
 
         {/* Default Route */}
