@@ -569,29 +569,29 @@ export default function DirectorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      {/* Top Bar - Meet Info */}
-      <div className="fixed top-0 left-0 right-0 bg-dark-bg-secondary border-b border-dark-border z-50">
-        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen bg-dark-bg flex flex-col">
+      {/* Top Bar - Meet Info - STICKY */}
+      <div className="sticky top-0 bg-dark-bg-secondary border-b border-dark-border z-50">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-dark-text">PAGINA REGISTA</h1>
-              <p className="text-sm text-primary">{meetName}</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-dark-text">PAGINA REGISTA</h1>
+              <p className="text-xs sm:text-sm text-primary">{meetName}</p>
             </div>
             <button
               onClick={() => navigate('/meets')}
-              className="btn-secondary flex items-center gap-2"
+              className="btn-secondary flex items-center gap-2 text-sm"
             >
               <ChevronLeft className="w-4 h-4" />
-              Torna alla lista
+              <span className="hidden sm:inline">Torna alla lista</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Control Bar - Dropdowns and Action Buttons */}
-      <div className="fixed top-[80px] left-0 right-0 bg-dark-bg border-b-2 border-dark-border shadow-lg z-40">
-        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Control Bar - Dropdowns and Action Buttons - STICKY */}
+      <div className="sticky top-[52px] sm:top-[68px] bg-dark-bg border-b-2 border-dark-border shadow-lg z-40">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <DirectorHeader
             flights={flights}
             selectedFlightId={selectedFlightId}
@@ -611,8 +611,8 @@ export default function DirectorPage() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 pt-[180px] pb-12">
+      {/* Main Content - Scrollable area below sticky headers */}
+      <main className="flex-1 max-w-[1800px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-4">
         {error && (
           <div className="error-message mb-6">
             {error}

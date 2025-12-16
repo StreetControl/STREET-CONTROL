@@ -54,7 +54,7 @@ export default function DirectorHeader({
   isGroupCompleted
 }: DirectorHeaderProps) {
   return (
-    <div className="flex flex-wrap items-end gap-4">
+    <div className="flex flex-wrap items-end gap-4 relative z-20">
       {/* Flight Selector */}
       <div className="flex-1 min-w-[200px]">
         <label className="block text-xs font-medium text-dark-text-secondary mb-1">

@@ -494,8 +494,8 @@ export default function JudgePage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4 flex flex-col gap-4">
+      {/* Main Content - Reordered for instant voting */}
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-3 flex flex-col gap-3">
         {/* Error Message */}
         {error && (
           <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
@@ -503,64 +503,33 @@ export default function JudgePage() {
           </div>
         )}
 
-        {/* Dropdowns */}
-        <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-4">
-          <div className="grid grid-cols-3 gap-3">
-            {/* Flight */}
-            <div>
-              <label className="block text-xs text-dark-text-secondary mb-1 uppercase tracking-wider">Flight</label>
-              <select
-                value={selectedFlightId || ''}
-                onChange={(e) => handleFlightChange(parseInt(e.target.value))}
-                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary"
-              >
-                {flights.map(flight => (
-                  <option key={flight.id} value={flight.id}>{flight.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Group */}
-            <div>
-              <label className="block text-xs text-dark-text-secondary mb-1 uppercase tracking-wider">Gruppo</label>
-              <select
-                value={selectedGroupId || ''}
-                onChange={(e) => handleGroupChange(parseInt(e.target.value))}
-                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary"
-              >
-                {availableGroups.map(group => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Lift */}
-            <div>
-              <label className="block text-xs text-dark-text-secondary mb-1 uppercase tracking-wider">Alzata</label>
-              <select
-                value={selectedLiftId || ''}
-                onChange={(e) => handleLiftChange(e.target.value)}
-                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary"
-              >
-                {lifts.map(lift => (
-                  <option key={lift.id} value={lift.id}>{lift.name}</option>
-                ))}
-              </select>
-            </div>
+        {/* 1. VOTING BUTTONS - FIRST! Large and prominent */}
+        {currentAthlete && !currentState?.completed && !voteResult && (
+          <div className="bg-dark-bg-secondary border-2 border-primary/30 rounded-xl p-4">
+            <VotingButtons
+              onVote={handleVote}
+              disabled={voting || !currentAttempt}
+              hasVoted={hasVoted}
+              lastVote={lastVote}
+              voteResult={voteResult}
+              votesReceived={votesReceived}
+            />
           </div>
+        )}
 
-          {/* Refresh button */}
-          <button
-            onClick={loadAthletes}
-            disabled={loadingAthletes}
-            className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text-secondary hover:text-dark-text text-sm"
-          >
-            <RefreshCw className={`w-4 h-4 ${loadingAthletes ? 'animate-spin' : ''}`} />
-            Aggiorna
-          </button>
-        </div>
+        {/* Vote Result Banner */}
+        {voteResult && (
+          <div className={`
+            rounded-xl p-4 text-center font-bold text-xl
+            ${voteResult === 'VALID'
+              ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
+              : 'bg-red-500/20 border-2 border-red-500 text-red-400'}
+          `}>
+            {voteResult === 'VALID' ? '✓ PROVA VALIDA' : '✗ PROVA NON VALIDA'}
+          </div>
+        )}
 
-        {/* Timer - HEAD Judge Only */}
+        {/* 2. TIMER - HEAD Judge Only */}
         {isHeadJudge && (
           <TimerDisplay
             ref={timerRef}
@@ -574,7 +543,7 @@ export default function JudgePage() {
           />
         )}
 
-        {/* Athlete Info */}
+        {/* 3. ATHLETE INFO */}
         {loadingAthletes ? (
           <AthleteInfoCard
             firstName=""
@@ -587,45 +556,75 @@ export default function JudgePage() {
             lastName={currentAthlete.last_name}
           />
         ) : currentState?.completed ? (
-          <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-6 text-center">
+          <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 text-center">
             <p className="text-green-400 font-medium">✓ Gruppo completato!</p>
             <p className="text-dark-text-secondary text-sm mt-1">Seleziona un altro gruppo o alzata.</p>
           </div>
         ) : (
-          <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-6 text-center">
+          <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-4 text-center">
             <p className="text-dark-text-secondary">Nessun atleta in pedana</p>
             <p className="text-xs text-dark-text-secondary mt-1">In attesa che il regista avanzi...</p>
           </div>
         )}
 
+        {/* 4. DROPDOWNS - At bottom, collapsible style */}
+        <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-3">
+          <div className="grid grid-cols-3 gap-2">
+            {/* Flight */}
+            <div>
+              <label className="block text-xs text-dark-text-secondary mb-1 uppercase tracking-wider">Flight</label>
+              <select
+                value={selectedFlightId || ''}
+                onChange={(e) => handleFlightChange(parseInt(e.target.value))}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-sm text-dark-text focus:outline-none focus:border-primary"
+              >
+                {flights.map(flight => (
+                  <option key={flight.id} value={flight.id}>{flight.name}</option>
+                ))}
+              </select>
+            </div>
 
+            {/* Group */}
+            <div>
+              <label className="block text-xs text-dark-text-secondary mb-1 uppercase tracking-wider">Gruppo</label>
+              <select
+                value={selectedGroupId || ''}
+                onChange={(e) => handleGroupChange(parseInt(e.target.value))}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-sm text-dark-text focus:outline-none focus:border-primary"
+              >
+                {availableGroups.map(group => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
+              </select>
+            </div>
 
-        {/* Voting Buttons */}
-        {currentAthlete && !currentState?.completed && !voteResult && (
-          <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-6">
-            <VotingButtons
-              onVote={handleVote}
-              disabled={voting || !currentAttempt}
-              hasVoted={hasVoted}
-              lastVote={lastVote}
-              voteResult={voteResult}
-              votesReceived={votesReceived}
-            />
+            {/* Lift */}
+            <div>
+              <label className="block text-xs text-dark-text-secondary mb-1 uppercase tracking-wider">Alzata</label>
+              <select
+                value={selectedLiftId || ''}
+                onChange={(e) => handleLiftChange(e.target.value)}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-sm text-dark-text focus:outline-none focus:border-primary"
+              >
+                {lifts.map(lift => (
+                  <option key={lift.id} value={lift.id}>{lift.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        )}
 
-        {/* Vote Result Banner (shown separately when voting is complete) */}
-        {voteResult && (
-          <div className={`
-            rounded-xl p-4 text-center font-bold text-xl
-            ${voteResult === 'VALID'
-              ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
-              : 'bg-red-500/20 border-2 border-red-500 text-red-400'}
-          `}>
-            {voteResult === 'VALID' ? '✓ PROVA VALIDA' : '✗ PROVA NON VALIDA'}
-          </div>
-        )}
+          {/* Refresh button - compact */}
+          <button
+            onClick={loadAthletes}
+            disabled={loadingAthletes}
+            className="mt-2 w-full flex items-center justify-center gap-2 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-dark-text-secondary hover:text-dark-text text-xs"
+          >
+            <RefreshCw className={`w-3 h-3 ${loadingAthletes ? 'animate-spin' : ''}`} />
+            Aggiorna
+          </button>
+        </div>
       </main>
     </div>
   );
 }
+

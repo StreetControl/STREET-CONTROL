@@ -42,7 +42,7 @@ export default function AthleteTable({
   onAttemptUpdate
 }: AthleteTableProps) {
   return (
-    <div className="card overflow-hidden mt-6">
+    <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

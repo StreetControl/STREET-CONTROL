@@ -84,21 +84,21 @@ export default function VotingButtons({
         <p className="text-sm text-dark-text-secondary mb-3 uppercase tracking-wider font-medium">
           Non Valida
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-6 sm:gap-8">
           {/* Button 1 - ROM (Red) - Range of Motion */}
           <div className="flex flex-col items-center">
             <button
               onClick={() => handleVoteInvalid('ROM')}
               disabled={disabled || hasVoted}
               className={`${baseButtonClass} 
-                w-20 h-20 sm:w-24 sm:h-24
+                w-28 h-28 sm:w-32 sm:h-32
                 bg-red-500/20 border-2 border-red-500/50 text-red-400
                 hover:bg-red-500/30 hover:border-red-500
                 ${hasVoted && lastVote === false ? 'ring-4 ring-red-500 bg-red-500/40' : ''}
               `}
               title="ROM - Range of Motion"
             >
-              <ArrowUpDown className="w-10 h-10" />
+              <ArrowUpDown className="w-14 h-14" />
             </button>
             <span className="mt-2 text-xs text-red-400 font-medium">ROM</span>
           </div>
@@ -109,14 +109,14 @@ export default function VotingButtons({
               onClick={() => handleVoteInvalid('DISCESA')}
               disabled={disabled || hasVoted}
               className={`${baseButtonClass} 
-                w-20 h-20 sm:w-24 sm:h-24
+                w-28 h-28 sm:w-32 sm:h-32
                 bg-blue-500/20 border-2 border-blue-500/50 text-blue-400
                 hover:bg-blue-500/30 hover:border-blue-500
                 ${hasVoted && lastVote === false ? 'ring-4 ring-blue-500 bg-blue-500/40' : ''}
               `}
               title="Discesa"
             >
-              <ArrowDown className="w-10 h-10" />
+              <ArrowDown className="w-14 h-14" />
             </button>
             <span className="mt-2 text-xs text-blue-400 font-medium">Discesa</span>
           </div>
@@ -127,14 +127,14 @@ export default function VotingButtons({
               onClick={() => handleVoteInvalid('ALTRO')}
               disabled={disabled || hasVoted}
               className={`${baseButtonClass} 
-                w-20 h-20 sm:w-24 sm:h-24
+                w-28 h-28 sm:w-32 sm:h-32
                 bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400
                 hover:bg-yellow-500/30 hover:border-yellow-500
                 ${hasVoted && lastVote === false ? 'ring-4 ring-yellow-500 bg-yellow-500/40' : ''}
               `}
               title="Altro"
             >
-              <HelpCircle className="w-10 h-10" />
+              <HelpCircle className="w-14 h-14" />
             </button>
             <span className="mt-2 text-xs text-yellow-400 font-medium">Altro</span>
           </div>
